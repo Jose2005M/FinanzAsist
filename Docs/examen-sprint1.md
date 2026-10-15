@@ -9,82 +9,124 @@
   Integrante 4 (Developer). Los cuatro son Developers.
 - **Historia técnica:** HU-04 · **Otra historia Must:** HU-05
 
-## 1. Persona y mapa de hoy
-- **Contexto:** Yolanda Pérez, 46 años, tendera del barrio Primero de Mayo. Atiende de 7 a. m. a 8 p. m. y ve el lote
-  de la esquina cada vez que abre.
-- **Teléfono y conexión:** Android de gama de entrada con poco espacio libre *(por validar)*; datos prepago que no le
-  alcanzan para todo el mes *(por validar)*; WhatsApp a diario.
-- **Quiere lograr:** que recojan el punto sin dejar la tienda sola ni pasar media hora en una llamada.
-- **La frena hoy:** no sabe a quién avisar ni cómo dar la dirección exacta; cuando avisó, nunca supo si sirvió
-  *(por validar)*.
-- **Una frase suya:** «Yo llamo, me piden la nomenclatura, y ese lote no tiene. Al final uno se cansa.» *(supuesta)*
+1. Persona y mapa de hoy
 
-| | 1 · Ve el punto | 2 · Avisa | 3 · Espera | 4 · No sabe qué pasó |
+- **Contexto:** persona propietaria o administradora de una pequeña tienda que comercializa productos y alterna atención al cliente con control del inventario (**por validar**). Decisión: dar acceso directo a la consulta de existencias.
+- **Teléfono y conexión:** utiliza un Android de gama de entrada y puede tener conectividad intermitente (**por validar**). Decisión: comprobar la interfaz a 360 dp y mostrar un error recuperable si no se pueden consultar datos; esto no incluye sincronización sin conexión de HU-20.
+- **Quiere lograr:** conocer las unidades disponibles y mantener actualizados el costo y el precio de sus productos (**por validar**). Decisión: conectar la lista de existencias con la edición del catálogo.
+- **La frena hoy:** consulta registros dispersos y puede confundir un precio desactualizado con el vigente (**por validar**). Decisión: centralizar el catálogo y confirmar cuándo se guarda una modificación.
+- **Una frase suya:** «Necesito saber cuántas unidades tengo y a qué precio las estoy vendiendo». Frase hipotética, **por validar**. Decisión: usar etiquetas comprensibles como «Existencias», «Costo de compra» y «Precio de venta».
+
+### Mapa de la situación actual, sin FinanzAsist
+
+Todas las prácticas y dificultades de esta tabla son hipótesis **por validar** con usuarios del público objetivo.
+
+| | 1 · Identifica el producto | 2 · Comprueba unidades | 3 · Consulta o actualiza valores | 4 · Atiende la venta |
 |---|---|---|---|---|
-| **Hace** | Ve bolsas nuevas en el lote al abrir la tienda | Llama a la línea de aseo y publica una foto en el grupo del barrio | Mira el lote cada mañana | Deja de avisar la siguiente vez |
-| **Dolor** | — | No puede dar la ubicación; la llamada es larga | No queda constancia de que avisó | Nadie le responde |
-| **Historia** | HU-01 | HU-01 · HU-02 · HU-12 · HU-03 | **HU-04** · **HU-05** | HU-10 · HU-09 |
+| **Hace hoy** | Busca el artículo físicamente o en sus apuntes | Cuenta unidades o revisa un cuaderno | Consulta una lista de precios y anota cambios | Entrega el producto y registra la venta por separado |
+| **Dolor** | Los nombres pueden estar incompletos o repetidos | El registro puede diferir de lo que tiene disponible | No distingue con facilidad el precio vigente | La venta y el inventario pueden quedar desactualizados |
+| **Historia que lo atiende** | HU-04 · HU-05 | HU-05 · HU-06 | HU-04 | HU-08 · HU-09 |
 
 ## 2. Criterios de aceptación
 
-### HU-04 · Lista de mis reportes (historia técnica)
+Propuesta para el examen, pendiente de revisión cruzada. Los nombres, cantidades y valores son datos ficticios de prueba. La moneda COP, las cantidades enteras y la aceptación de costo o precio cero están **por validar**; se propone impedir valores negativos. Los criterios se ejecutan en el contexto de una empresa autorizada. La demostración con una empresa simulada no verifica HU-03.
+
+### HU-05 · Consultar las existencias disponibles de cada producto
+
+**Como** propietario o administrador, **quiero** consultar las existencias de mis productos, **para** saber qué unidades tengo disponibles.
+
 ```gherkin
 # language: es
-Escenario: Lista con datos
-  Dado que tengo varios reportes
-  Cuando abro «Mis reportes»
-  Entonces los veo del más reciente al más antiguo
-  Y cada uno muestra miniatura, fecha y lugar
+Escenario: Consultar una lista con existencias
+  Dado que la empresa activa tiene los productos Arroz con 12 unidades, Aceite con 5 unidades y Azúcar con 0 unidades
+  Cuando consulto el inventario
+  Entonces veo los 3 productos con su nombre y sus existencias respectivas
+  Y Azúcar aparece con 0 unidades
 
-Escenario: No se pueden leer
-  Dado que los reportes guardados no se pueden leer
-  Cuando abro «Mis reportes»
-  Entonces veo un mensaje en lenguaje llano
-  Y puedo reintentar
+Escenario: Fallo al consultar el inventario
+  Dado que la fuente de datos del inventario devuelve un error
+  Cuando consulto el inventario
+  Entonces veo el mensaje «No pudimos cargar el inventario»
+  Y tengo disponible la opción de reintentar la consulta
+  Y no se presenta el fallo como si la empresa no tuviera productos
 
-Escenario: Lista vacía
-  Dado que todavía no he hecho ningún reporte
-  Cuando abro «Mis reportes»
-  Entonces veo un mensaje que me invita a crear el primero
-  Y la forma de hacerlo
+Escenario: Inventario vacío en el móvil
+  Dado que la empresa activa tiene 0 productos registrados
+  Cuando consulto el inventario
+  Entonces veo el mensaje «Todavía no tienes productos registrados»
+  Y tengo disponible una acción para iniciar el registro del primer producto
 ```
-**Revisó:** Integrante 3
 
-### HU-05 · Detalle de un reporte
+**Autor propuesto:** Jose Manuel Torres Neira.
+
+**Revisor propuesto:** Juan David Ramos. **Revisó:** por validar; completar después de la revisión efectiva.
+
+### HU-04 · Registrar y actualizar productos, costos de compra y precios de venta
+
+**Como** propietario o administrador, **quiero** registrar y actualizar los datos de mis productos, **para** mantener vigente mi catálogo.
+
 ```gherkin
 # language: es
-Escenario: Abrir el detalle
-  Dado que estoy en «Mis reportes»
-  Cuando elijo un reporte
-  Entonces veo su foto en grande, la fecha y la hora, y el lugar
+Escenario: Registrar un producto con datos válidos
+  Dado que preparo un producto llamado Arroz de 1 kg con costo de compra de 3000 COP y precio de venta de 4200 COP
+  Cuando confirmo su registro
+  Entonces veo la confirmación de que el producto fue guardado
+  Y el producto aparece en el catálogo con ese nombre, costo y precio
+  Y sus existencias iniciales son 0 unidades
 
-Escenario: Volver a la lista
-  Dado que abrí un detalle desde la mitad de la lista
-  Cuando vuelvo atrás
-  Entonces la lista está en la misma posición
+Escenario: Rechazar un precio de venta negativo
+  Dado que preparo un producto con nombre válido, costo de compra de 3000 COP y precio de venta de -100 COP
+  Cuando confirmo su registro
+  Entonces veo el mensaje «El precio de venta no puede ser negativo»
+  Y el producto no se incorpora al catálogo
+  Y los datos introducidos permanecen disponibles para corregirlos
 
-Escenario: Pantalla pequeña
-  Dado un teléfono de 360 dp de ancho
-  Cuando abro el detalle
-  Entonces todo se lee sin cortarse y sin desplazarme de lado
+Escenario: Actualizar un producto en una pantalla de 360 dp
+  Dado que edito un producto existente en un teléfono de 360 dp de ancho
+  Y he cambiado su precio de venta de 4200 COP a 4500 COP
+  Cuando confirmo la actualización
+  Entonces veo la confirmación de que los cambios fueron guardados sin texto cortado ni desplazamiento horizontal
+  Y el catálogo muestra el precio de venta de 4500 COP para ese mismo producto
+  Y no se crea un producto adicional ni se modifican sus existencias
 ```
-**Revisó:** Integrante 4. *Observación de la revisión:* HU-05 no tiene escenario de error propio; el equipo decide que lo
-cubre HU-04 y lo deja como pregunta para el Sprint 2.
+
+**Autor propuesto:** Jose Manuel Torres Neira, con apoyo de Victor Hugo Gomez Echeverri.
+
+**Revisor propuesto:** Juan Esteban Antolinez. **Revisó:** por validar; completar después de la revisión efectiva.
+
+**Límites y dependencias:**
+- Se propone que registrar un producto cree su catálogo con 0 unidades; validar esta regla con el PO. Las existencias iniciales y ajustes con motivo corresponden a HU-06.
+- Comprar y vender modifica las existencias mediante HU-07 y HU-08, no mediante la edición del catálogo.
+- Cambiar el costo o precio del catálogo no debe modificar los valores históricos conservados en ventas anteriores (HU-09). Verificarlo en la integración correspondiente.
+- Estos seis escenarios son el mínimo del examen; no agotan las validaciones de HU-04 ni la seguridad por empresa.
 
 ## 3. MVP y calidad
 
-| Actividad | Historia del MVP |
-|---|---|
-| Capturar el punto | HU-01 · HU-02 · HU-12 |
-| Guardar el reporte | HU-03 |
-| Consultar mis reportes | HU-04 · HU-05 |
-| Hacer que llegue a alguien | HU-10 |
+### Corte del MVP propuesto
 
-- **Puntos del MVP:** 23 de 53 (43 %), con TEC-01 y TEC-02.
-- **Requisito de calidad 1:** «Mis reportes» se muestra en menos de 1 s con 200 reportes guardados, en un Android de gama
-  de entrada (vive en HU-04).
-- **Requisito de calidad 2:** ningún reporte guardado se pierde si la app se cierra, el teléfono se apaga o se queda sin
-  batería (vive en HU-03).
+| Actividad del usuario | Historias mínimas del MVP | Puntos |
+|---|---|---:|
+| Acceder a la información de su empresa | HU-01 · HU-02 · HU-03 | 11 |
+| Preparar y consultar productos y existencias | HU-04 · HU-05 · HU-06 | 10 |
+| Registrar compras de mercancía | HU-07 | 5 |
+| Registrar ventas conservando sus valores históricos | HU-08 · HU-09 | 13 |
+| Registrar gastos operativos | HU-10 | 3 |
+| Consultar resultados por período | HU-14 | 8 |
+| **Subtotal de historias** | **12 historias Must** | **50** |
+
+- **Soporte técnico:** TEC-01 (2 puntos) y TEC-02 (8 puntos): 10 puntos.
+- **Puntos del MVP:** 50 + 10 = **60 puntos**.
+- **Total del backlog base:** **111 puntos** en 20 HU y 2 TEC.
+- **Porcentaje:** 60 / 111 × 100 = **54,05 %**, inferior al límite del 60 %.
+- **Fuera del corte inicial:** HU-11, HU-12, HU-13, HU-15, HU-16, HU-17, HU-18, HU-19 y HU-20: 51 puntos.
+- El cálculo usa las estimaciones iniciales del documento del proyecto; su vigencia y el denominador exigido por el docente están **por validar**. Las tareas S1 de exploración no se suman al backlog base de implementación.
+
+El MVP completo no se implementa en las tres horas del examen. HU-05 y HU-04 son el foco de esta prueba técnica. Antes de implementar ventas y reportes deben acordarse el método de costeo y la base de los indicadores de ingresos y egresos.
+
+### Dos requisitos de calidad propuestos
+
+1. **Rendimiento:** la pantalla de inventario debe mostrar los nombres y existencias de la primera vista de la lista en un máximo de **1 segundo**, medido desde la solicitud de apertura hasta la aparición de los datos, con **200 productos en un repositorio local de prueba**, en **5 aperturas consecutivas** sobre el Android identificado en la sección 4, sin retardo artificial. Umbral y dispositivo: **por validar**. Se relaciona con HU-05; no acredita el rendimiento de un servicio remoto.
+2. **Adaptación a pantalla móvil:** las pantallas de inventario y registro/edición deben permitir leer sus etiquetas, mensajes y valores completos con **0 desplazamientos horizontales y 0 solapamientos**, en orientación vertical de **360 dp de ancho**, escala de texto del sistema de **100 %** y nombres de producto de hasta **60 caracteres**; se permite ajuste de línea y desplazamiento vertical. Condiciones: **por validar**. Se relaciona con HU-04 y HU-05.
 
 ## 4. Prueba técnica · Flutter + Dart
 - **Pull request:** `examen/sprint1-tecnico` → `main` (en este repositorio modelo ya está revisado y fusionado; ver
