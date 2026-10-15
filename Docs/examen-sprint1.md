@@ -4,10 +4,14 @@
 > (versión de máximo 3 horas). Un equipo real escribe esto sobre **su propio** proyecto: copiar este contenido no
 > puntúa.
 
-- **Equipo y proyecto:** Equipo modelo · EcoReporte
-- **Integrantes y rol:** Integrante 1 (PO) · Integrante 2 (Scrum Master) · Integrante 3 (líder de UX/UI) ·
-  Integrante 4 (Developer). Los cuatro son Developers.
-- **Historia técnica:** HU-04 · **Otra historia Must:** HU-05
+- **Equipo y proyecto:** Los Juanchos · FinanzAsist · Ingeniería Informática, UNIPAZ.
+- **Product Owner:** Jose Manuel Torres Neira.
+- **Scrum Master / facilitador propuesto para Sprint 1:** Juan Esteban Antolinez.
+- **Líder de UX/UI y desarrollo:** Victor Hugo Gomez Echeverri.
+- **Responsable de pruebas:** Juan David Ramos (Juancho).
+- **Documentación:** Juan Esteban Antolinez.
+- **Historia técnica:** HU-14 · Consultar reportes por período.
+- **Otra historia Must:** HU-08 · Registrar ventas.
 
 ## 1. Persona y mapa de hoy
 
