@@ -11,16 +11,15 @@
 
 ## 1. Persona y mapa de hoy
 
-•	Contexto: Sandra, propietaria de una pequeña tienda de productos para el hogar, atiende clientes y lleva los registros del negocio en un cuaderno (por validar). Necesita registrar las ventas durante la atención.
-•	Teléfono y conexión: Android de gama de entrada; utiliza datos prepago y tiene conexión intermitente (por validar). Esto orienta una interfaz sencilla y mensajes claros cuando falla una consulta.
-•	Quiere lograr: registrar lo que vende y saber cuánto le queda después de descontar el costo de los productos vendidos y los gastos del negocio (por validar).
-•	La frena hoy: anota ventas y gastos en lugares distintos; al cerrar el negocio debe reunir los registros y repetir cálculos para estimar la utilidad (por validar).
-•	Una frase suya: «Vendo todos los días, pero cuando cierro no sé cuánto fue ganancia y cuánto necesito para reponer mercancía» (frase supuesta, por validar).
-•		1 · Atiende una venta	2 · Anota lo vendido	3 · Reúne las cuentas	4 · Intenta saber cuánto ganó
+- Contexto: Sandra, propietaria de una pequeña tienda de productos para el hogar, atiende clientes y lleva los registros del negocio en un cuaderno (por validar). Necesita registrar las ventas durante la atención.
+- Teléfono y conexión: Android de gama de entrada; utiliza datos prepago y tiene conexión intermitente (por validar). Esto orienta una interfaz sencilla y mensajes claros cuando falla una consulta.
+- Quiere lograr: registrar lo que vende y saber cuánto le queda después de descontar el costo de los productos vendidos y los gastos del negocio (por validar).
+- La frena hoy: anota ventas y gastos en lugares distintos; al cerrar el negocio debe reunir los registros y repetir cálculos para estimar la utilidad (por validar).
+- Una frase suya: «Vendo todos los días, pero cuando cierro no sé cuánto fue ganancia y cuánto necesito para reponer mercancía» (frase supuesta, por validar).
+	1 · Atiende una venta	2 · Anota lo vendido	3 · Reúne las cuentas	4 · Intenta saber cuánto ganó
 Hace	Consulta una lista de precios y calcula cantidades y descuentos con una calculadora.	Escribe la venta en un cuaderno y descuenta las unidades en otro registro.	Al terminar la semana, reúne las ventas, los costos y los comprobantes de gastos.	Suma las ventas y resta costos y gastos para estimar la utilidad.
 Dolor	Puede equivocarse al calcular el total o aplicar un descuento.	Puede olvidar una anotación y dejar las existencias desactualizadas.	Los registros están dispersos y debe consolidarlos manualmente.	Puede omitir valores y confundir el total vendido con la ganancia.
 Historia	HU-08 · Registrar ventas.	HU-08 · Registrar ventas.	HU-14 · Consultar reportes por período.	HU-14 · Consultar reportes por período.
-
 ## 2. Criterios de aceptación
 
 Propuesta para el examen, pendiente de revisión cruzada. Los nombres, cantidades y valores son datos ficticios de prueba. La moneda COP, las cantidades enteras y la aceptación de costo o precio cero están **por validar**; se propone impedir valores negativos. Los criterios se ejecutan en el contexto de una empresa autorizada. La demostración con una empresa simulada no verifica HU-03.
