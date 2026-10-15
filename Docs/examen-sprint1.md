@@ -9,7 +9,7 @@
   Integrante 4 (Developer). Los cuatro son Developers.
 - **Historia técnica:** HU-04 · **Otra historia Must:** HU-05
 
-1. Persona y mapa de hoy
+## 1. Persona y mapa de hoy
 
 - **Contexto:** persona propietaria o administradora de una pequeña tienda que comercializa productos y alterna atención al cliente con control del inventario (**por validar**). Decisión: dar acceso directo a la consulta de existencias.
 - **Teléfono y conexión:** utiliza un Android de gama de entrada y puede tener conectividad intermitente (**por validar**). Decisión: comprobar la interfaz a 360 dp y mostrar un error recuperable si no se pueden consultar datos; esto no incluye sincronización sin conexión de HU-20.
