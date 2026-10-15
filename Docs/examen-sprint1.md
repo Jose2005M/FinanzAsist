@@ -11,21 +11,15 @@
 
 ## 1. Persona y mapa de hoy
 
-- **Contexto:** persona propietaria o administradora de una pequeña tienda que comercializa productos y alterna atención al cliente con control del inventario (**por validar**). Decisión: dar acceso directo a la consulta de existencias.
-- **Teléfono y conexión:** utiliza un Android de gama de entrada y puede tener conectividad intermitente (**por validar**). Decisión: comprobar la interfaz a 360 dp y mostrar un error recuperable si no se pueden consultar datos; esto no incluye sincronización sin conexión de HU-20.
-- **Quiere lograr:** conocer las unidades disponibles y mantener actualizados el costo y el precio de sus productos (**por validar**). Decisión: conectar la lista de existencias con la edición del catálogo.
-- **La frena hoy:** consulta registros dispersos y puede confundir un precio desactualizado con el vigente (**por validar**). Decisión: centralizar el catálogo y confirmar cuándo se guarda una modificación.
-- **Una frase suya:** «Necesito saber cuántas unidades tengo y a qué precio las estoy vendiendo». Frase hipotética, **por validar**. Decisión: usar etiquetas comprensibles como «Existencias», «Costo de compra» y «Precio de venta».
-
-### Mapa de la situación actual, sin FinanzAsist
-
-Todas las prácticas y dificultades de esta tabla son hipótesis **por validar** con usuarios del público objetivo.
-
-| | 1 · Identifica el producto | 2 · Comprueba unidades | 3 · Consulta o actualiza valores | 4 · Atiende la venta |
-|---|---|---|---|---|
-| **Hace hoy** | Busca el artículo físicamente o en sus apuntes | Cuenta unidades o revisa un cuaderno | Consulta una lista de precios y anota cambios | Entrega el producto y registra la venta por separado |
-| **Dolor** | Los nombres pueden estar incompletos o repetidos | El registro puede diferir de lo que tiene disponible | No distingue con facilidad el precio vigente | La venta y el inventario pueden quedar desactualizados |
-| **Historia que lo atiende** | HU-04 · HU-05 | HU-05 · HU-06 | HU-04 | HU-08 · HU-09 |
+•	Contexto: Sandra, propietaria de una pequeña tienda de productos para el hogar, atiende clientes y lleva los registros del negocio en un cuaderno (por validar). Necesita registrar las ventas durante la atención.
+•	Teléfono y conexión: Android de gama de entrada; utiliza datos prepago y tiene conexión intermitente (por validar). Esto orienta una interfaz sencilla y mensajes claros cuando falla una consulta.
+•	Quiere lograr: registrar lo que vende y saber cuánto le queda después de descontar el costo de los productos vendidos y los gastos del negocio (por validar).
+•	La frena hoy: anota ventas y gastos en lugares distintos; al cerrar el negocio debe reunir los registros y repetir cálculos para estimar la utilidad (por validar).
+•	Una frase suya: «Vendo todos los días, pero cuando cierro no sé cuánto fue ganancia y cuánto necesito para reponer mercancía» (frase supuesta, por validar).
+•		1 · Atiende una venta	2 · Anota lo vendido	3 · Reúne las cuentas	4 · Intenta saber cuánto ganó
+Hace	Consulta una lista de precios y calcula cantidades y descuentos con una calculadora.	Escribe la venta en un cuaderno y descuenta las unidades en otro registro.	Al terminar la semana, reúne las ventas, los costos y los comprobantes de gastos.	Suma las ventas y resta costos y gastos para estimar la utilidad.
+Dolor	Puede equivocarse al calcular el total o aplicar un descuento.	Puede olvidar una anotación y dejar las existencias desactualizadas.	Los registros están dispersos y debe consolidarlos manualmente.	Puede omitir valores y confundir el total vendido con la ganancia.
+Historia	HU-08 · Registrar ventas.	HU-08 · Registrar ventas.	HU-14 · Consultar reportes por período.	HU-14 · Consultar reportes por período.
 
 ## 2. Criterios de aceptación
 
