@@ -1,8 +1,78 @@
 # FinanzAsist
 
+**APK local actualizada:** versión **1.0.2**, compilación **3**, generada el 16 de noviembre de 2026. Archivo: `build/app/outputs/flutter-apk/FinanzAsist-1.0.2.apk`. Añade importes sin ambigüedad con vista previa en COP, protección de cambios sin guardar y navegación directa que conserva consultas y borradores. Incluye las guías, búsqueda de productos y períodos rápidos anteriores. Es una compilación release para pruebas, firmada con la clave de depuración existente.
+
 Aplicación móvil para la gestión financiera de pequeñas y medianas empresas que comercializan productos. Centraliza inventario, compras, ventas y gastos para consultar la utilidad y comprender el desempeño del negocio.
 
 Proyecto académico del equipo **Los Juanchos**, del programa de Ingeniería Informática del Instituto Universitario de la Paz, UNIPAZ.
+
+**Guía de uso:** [Manual de usuario de FinanzAsist](Docs/manual-usuario.md), con recorridos, capturas, un ejercicio completo y solución de problemas frecuentes.
+
+**Mejoras de esta entrega:** [Mejoras prioritarias de la versión 1.0.2](Docs/mejoras-prioridad-alta.md), con reglas de entrada, navegación, límites de los borradores y evidencias.
+
+**Funcionalidades de esta versión:** [informe en Markdown](Docs/funcionalidades-version-actual.md), [Word editable](Docs/entregables/FinanzAsist-funcionalidades-v1.0.0.docx) y [PDF](Docs/entregables/FinanzAsist-funcionalidades-v1.0.0.pdf), con alcance por módulo, límites y funciones pendientes al 12 de noviembre de 2026.
+
+**Seguimiento:** [Estado del Kanban y funciones](Docs/estado-kanban.md), comparación del tablero público, el código publicado y el avance local, consultada el 11 de noviembre de 2026.
+
+## Desarrollo disponible · 12 de noviembre de 2026
+
+Están implementadas HU-04 a HU-10 y HU-14: catálogo editable, existencias, ajustes, compras, ventas, costos históricos, gastos operativos y reportes por período. Todos los módulos utilizan la misma información. Las confirmaciones tienen identificador único, bloqueo durante el envío y actualización atómica de existencias.
+
+HU-01 y HU-02 añaden **registro de empresa y propietario, inicio y cierre de sesión locales**. Se accede con correo y contraseña. El menú **Cuenta de empresa** de Inventario permite salir. Las pantallas privadas desaparecen al cerrar sesión y cada empresa consulta sus propios registros. Consulta las decisiones y pruebas en [Docs/validacion-acceso.md](Docs/validacion-acceso.md).
+
+Toda la aplicación comparte el [diseño crema y dorado](DESIGN.md) de la referencia de acceso: navegación, inventario, formularios, compras, ventas, gastos, reportes y calendarios. Consulta las [capturas y comprobaciones](Docs/diseno-general.md). El [diseño del acceso](Docs/diseno-acceso.md) detalla además el teclado, los mensajes accesibles y el foco del primer campo incorrecto.
+
+Los cinco módulos incluyen **guías iniciales opcionales** que explican su propósito y primeros pasos. Se pueden ocultar y reabrir, y cada cuenta recuerda cuáles ha leído. Inventario permite **buscar productos** sin distinguir tildes ni mayúsculas; Reportes ofrece **Hoy, Últimos 7 días y Este mes** con consulta automática. La [revisión de usabilidad](Docs/usabilidad-y-guias.md) documenta los cambios y las siguientes mejoras propuestas.
+
+**Android guarda los datos en SQLite** (`finanzasist.db`, directorio privado de bases de datos de la aplicación). Inicia con un inventario vacío. Productos, operaciones, gastos, detalles históricos y movimientos sobreviven al cierre de la aplicación. El dinero se calcula y almacena en centavos enteros; las pantallas lo presentan en COP. Los formularios reciben valores sin separadores de miles y permiten punto o coma decimal con hasta dos cifras. `6.000` y `6,000` se rechazan: para seis mil se escribe `6000`. Cada campo monetario válido muestra su equivalencia en COP.
+
+La barra inferior permite cambiar directamente entre los cinco módulos, incluso desde formularios. Conserva filtros, desplazamiento y borradores durante la sesión. Los datos y las existencias de los detalles y operaciones abiertos se actualizan tras cambios en otro módulo, conservando los valores escritos. Volver o cancelar con cambios ofrece seguir editando o descartarlos; mientras se guarda se bloquea la salida y el cambio de módulo. Los borradores viven en memoria y pueden perderse al cerrar sesión o reiniciar.
+
+Android normal comienza en **Inicia sesión**. **Crear cuenta de empresa** solicita empresa, nombre, correo y contraseña de 8 a 128 caracteres. La primera cuenta vincula los datos anteriores de `negocio-local`, si existen; los responsables históricos se conservan y los registros nuevos utilizan el propietario autenticado. Las demás cuentas crean empresas vacías. SQLite migra automáticamente a la versión 4 sin eliminar los registros existentes; la versión 4 añade las preferencias de las guías por cuenta. Las cuentas permanecen al reiniciar, pero se debe iniciar sesión de nuevo. No hay servicio remoto, recuperación por correo ni sincronización. HU-03 está parcialmente atendida: faltan roles y permisos administrables.
+
+### Ejecutar
+
+Entorno comprobado: Flutter 3.47.1 y Dart 3.13.1; Android SDK y emulador Pixel 5 con Android 16, API 36.
+
+```powershell
+flutter pub get
+flutter devices
+flutter emulators --launch Pixel_5
+flutter run -d emulator-5554
+```
+
+Para recorrer las funciones: usa **+** en Inventario para registrar un producto; abre su detalle para editarlo, registrar existencias iniciales, ajustar unidades y consultar movimientos. En **Compras** o **Ventas**, selecciona **Registrar**, agrega productos, cantidades y valores, revisa el resumen y confirma. Un ajuste negativo resta unidades; una compra suma y una venta resta. El descuento es un importe total de la venta entre cero y el subtotal. Volver o cancelar antes de confirmar conserva el inventario.
+
+Ejemplo: registra 10 unidades iniciales, compra 5 y vende 4. El inventario y el detalle deben mostrar **11 unidades**. Los historiales de compras y ventas conservan los nombres, cantidades y valores cobrados al confirmar, aunque luego se edite el catálogo.
+
+En **Gastos**, registra fecha, concepto, categoría y valor positivo. En **Reportes**, selecciona Desde y Hasta y pulsa **Consultar reporte**. El resultado incluye ventas, descuentos, ingresos netos, compras, gastos, egresos, costo de ventas y utilidades. Ambos días se incluyen completos según Colombia (UTC-5). Los calendarios están en español.
+
+El costo asignado es el costo del catálogo al confirmar cada venta. El reporte utiliza esa copia histórica; las compras no se descuentan otra vez de la utilidad. Se consideran operaciones al contado, sin impuestos ni devoluciones. Los criterios y las decisiones se documentan en [Docs/validacion-finanzas.md](Docs/validacion-finanzas.md).
+
+### Demostración sin persistencia
+
+```powershell
+flutter run -d emulator-5554 --dart-define=DEMO=true
+flutter run -d chrome --dart-define=DEMO=true
+```
+
+La demostración utiliza los cinco productos ficticios del equipo y muestra una etiqueta explícita. En modo debug conserva el selector de cargando, vacío, error y contenido; cambiar esos escenarios reinicia los datos simulados. No escribe en SQLite. Web utiliza siempre este modo. El borrador de una compra se conserva durante una pausa o llamada mientras el formulario siga abierto; no se promete su recuperación si Android finaliza el proceso.
+
+### Verificar
+
+```powershell
+dart format lib test integration_test test_driver
+flutter analyze
+flutter test
+flutter build apk --debug
+flutter test integration_test/sprint1_test.dart -d emulator-5554
+```
+
+Las pruebas Android utilizan empresas QA independientes de la empresa local. Los informes de resultados y criterios están en [Docs/validacion-sprint1.md](Docs/validacion-sprint1.md) y [Docs/validacion-finanzas.md](Docs/validacion-finanzas.md). La APK de depuración queda en `build/app/outputs/flutter-apk/app-debug.apk`. El recorrido de gastos y reportes se ejecuta con `flutter test integration_test/finanzas_test.dart -d emulator-5554`.
+
+Para regenerar las capturas del recorrido: `flutter drive --driver=test_driver/integration_test.dart --target=integration_test/sprint1_test.dart -d emulator-5554 --dart-define=CAPTURAS=true`. Se guardan en `build/qa/`.
+
+Los apartados siguientes conservan la visión, el backlog y el proceso académico del equipo. El acceso remoto, los permisos por rol, clientes, proveedores, categorías administrables, gráficos y sincronización continúan pendientes.
 
 ## 1. Visión del producto
 
@@ -17,8 +87,8 @@ Desarrollar una aplicación móvil que permita a pequeñas y medianas empresas c
 - **Usuarios:** propietarios, administradores y responsables financieros de pequeñas y medianas empresas que comercializan productos.
 - **Plataforma inicial:** Android.
 - **Tipo de aplicación:** móvil multiplataforma, con posibilidad de una versión posterior para iOS.
-- **Etapa inicial:** exploración de requisitos, prototipado y validación con usuarios.
-- **Tecnología de desarrollo y almacenamiento:** por definir y documentar antes de implementar la base técnica.
+- **Etapa actual:** HU-01/HU-02 locales, HU-04 a HU-10 y HU-14; HU-03 parcial. Validación con usuarios y revisión humana pendientes.
+- **Tecnología de desarrollo y almacenamiento:** Flutter + Dart, MVVM y SQLite mediante `sqflite` en Android. Demostración web en memoria.
 
 ## 4. Equipo y responsabilidades
 
@@ -91,7 +161,7 @@ La primera versión permitirá registrar productos, costos de compra, precios de
 - La utilidad resultante considerada por el producto descuenta también los gastos operativos registrados del período.
 - La compra de mercancía que todavía permanece en inventario no se descuenta íntegramente como costo vendido.
 - Cambiar el precio o costo del catálogo no modifica los valores conservados en ventas anteriores.
-- El método de costeo del inventario debe acordarse antes de implementar ventas y reportes.
+- HU-09 y los reportes usan el costo del catálogo al confirmar la venta. FIFO y promedio ponderado requieren una decisión posterior del equipo. Una compra conserva su costo en el detalle de la operación y no reemplaza automáticamente el costo del catálogo.
 - La base de los indicadores de ingresos y egresos debe definirse antes de presentarlos: una venta registrada y un cobro no siempre representan el mismo evento.
 
 ## 7. Product Backlog

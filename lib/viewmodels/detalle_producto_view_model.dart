@@ -1,20 +1,23 @@
 import 'package:flutter/foundation.dart';
 
 import '../data/producto_repository.dart';
+import '../data/negocio_repository.dart';
+import '../models/operacion.dart';
 import '../models/producto.dart';
 
 enum EstadoDetalle { cargando, contenido, error }
 
 class DetalleProductoViewModel extends ChangeNotifier {
   DetalleProductoViewModel({
-    required ProductoRepository repositorio,
+    required this.repositorio,
     required this.productoId,
-  }) : _repositorio = repositorio;
+  });
 
-  final ProductoRepository _repositorio;
+  final ProductoRepository repositorio;
   final String productoId;
   EstadoDetalle _estado = EstadoDetalle.cargando;
   Producto? _producto;
+  List<MovimientoInventario> movimientos = const [];
   String _mensajeError = '';
   bool _eliminado = false;
   int _solicitudActual = 0;
@@ -23,16 +26,23 @@ class DetalleProductoViewModel extends ChangeNotifier {
   Producto? get producto => _producto;
   String get mensajeError => _mensajeError;
 
-  Future<void> cargar() async {
+  Future<void> cargar({bool mostrarCarga = true}) async {
     if (_eliminado) return;
     final solicitud = ++_solicitudActual;
-    _estado = EstadoDetalle.cargando;
-    _producto = null;
+    if (mostrarCarga) {
+      _estado = EstadoDetalle.cargando;
+      _producto = null;
+    }
     notifyListeners();
     try {
-      final producto = await _repositorio.obtenerPorId(productoId);
+      final producto = await repositorio.obtenerPorId(productoId);
+      final fuente = repositorio;
+      final historial = fuente is NegocioRepository
+          ? await fuente.obtenerMovimientos(productoId: productoId)
+          : <MovimientoInventario>[];
       if (_eliminado || solicitud != _solicitudActual) return;
       _producto = producto;
+      movimientos = historial;
       _estado = producto == null
           ? EstadoDetalle.error
           : EstadoDetalle.contenido;

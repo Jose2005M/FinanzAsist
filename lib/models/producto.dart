@@ -5,6 +5,7 @@ class Producto {
     required this.cantidad,
     required this.costoCompra,
     required this.precioVenta,
+    this.empresaId = 'negocio-local',
   });
 
   final String id;
@@ -12,4 +13,14 @@ class Producto {
   final int cantidad;
   final double costoCompra;
   final double precioVenta;
+  final String empresaId;
+
+  Producto conCantidad(int valor) => Producto(
+    id: id,
+    nombre: nombre,
+    cantidad: valor,
+    costoCompra: costoCompra,
+    precioVenta: precioVenta,
+    empresaId: empresaId,
+  );
 }

@@ -4,6 +4,8 @@ import 'package:finanzasist/data/repositorio_simulado.dart';
 import 'package:finanzasist/main.dart';
 import 'package:finanzasist/models/producto.dart';
 
+import 'soporte_guias.dart';
+
 void configurarPantalla(WidgetTester tester) {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = const Size(360, 800);
@@ -17,6 +19,7 @@ Future<void> abrirInventario(WidgetTester tester) async {
   configurarPantalla(tester);
   await tester.pumpWidget(
     FinanzAsistApp(
+      almacenGuias: guiasRevisadas(),
       repositorio: RepositorioSimulado(
         retardo: const Duration(milliseconds: 10),
       ),
@@ -68,7 +71,11 @@ void main() {
     (tester) async {
       await abrirInventario(tester);
       final producto = find.byKey(const ValueKey('producto-P003'));
-      await tester.ensureVisible(producto);
+      await tester.scrollUntilVisible(
+        producto,
+        180,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.pumpAndSettle();
       await tester.tap(producto);
       await tester.pumpAndSettle();
@@ -79,9 +86,9 @@ void main() {
       expect(find.text('15 unidades'), findsOneWidget);
       expect(tester.takeException(), isNull);
 
-      await tester.pageBack();
+      await tester.tap(find.byType(BackButton));
       await tester.pumpAndSettle();
-      expect(find.text('Inventario'), findsOneWidget);
+      expect(find.byType(NavigationBar), findsOneWidget);
     },
   );
 
@@ -90,7 +97,11 @@ void main() {
   ) async {
     await abrirInventario(tester);
     final producto = find.byKey(const ValueKey('producto-P005'));
-    await tester.scrollUntilVisible(producto, 180);
+    await tester.scrollUntilVisible(
+      producto,
+      180,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(producto);
     await tester.pumpAndSettle();
 
@@ -105,6 +116,10 @@ void main() {
     (tester) async {
       await abrirInventario(tester);
       await tester.tap(find.byKey(const ValueKey('escenario-vacio')));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('registrar-desde-vacio')),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('registrar-desde-vacio')));
       await tester.pumpAndSettle();
@@ -126,7 +141,7 @@ void main() {
       await tester.tap(find.text('Guardar producto'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Inventario'), findsOneWidget);
+      expect(find.byType(NavigationBar), findsOneWidget);
       expect(find.text('Café de 500 g'), findsOneWidget);
       expect(find.text('0 unidades disponibles'), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -142,6 +157,7 @@ void main() {
         'familiar de 4 litros';
     await tester.pumpWidget(
       FinanzAsistApp(
+        almacenGuias: guiasRevisadas(),
         repositorio: RepositorioSimulado(
           retardo: Duration.zero,
           productosIniciales: const [

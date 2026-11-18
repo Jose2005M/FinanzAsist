@@ -3,7 +3,11 @@
 # Épica: Acceso
 # MoSCoW: Must
 # Puntos: 3
-# Pendiente de definición: campos obligatorios, identificador único y política de credenciales.
+# Implementación local: empresa, nombre del propietario, correo y contraseña obligatorios.
+# El correo es único en este dispositivo y se compara sin espacios exteriores ni mayúsculas.
+# Contraseña de 8 a 128 caracteres, sin reglas de composición y con confirmación en pantalla.
+# El registro inicia sesión; la primera cuenta vincula el negocio local anterior, si existe.
+# Pendiente: validación del equipo para servicio remoto y recuperación de cuentas.
 
 @HU_01 @Must
 Característica: HU-01 · Registrar la cuenta y la empresa

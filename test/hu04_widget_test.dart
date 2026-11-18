@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'soporte_guias.dart';
+
 import 'package:finanzasist/data/repositorio_simulado.dart';
 import 'package:finanzasist/main.dart';
 
@@ -13,14 +16,21 @@ Future<RepositorioSimulado> abrirCatalogo(WidgetTester tester) async {
   final repositorio = RepositorioSimulado(
     retardo: const Duration(milliseconds: 30),
   );
-  await tester.pumpWidget(FinanzAsistApp(repositorio: repositorio));
+  await tester.pumpWidget(
+    FinanzAsistApp(repositorio: repositorio, almacenGuias: guiasRevisadas()),
+  );
   await tester.pumpAndSettle();
   return repositorio;
 }
 
 Future<void> abrirEdicion(WidgetTester tester, String id) async {
   final fila = find.byKey(ValueKey('producto-$id'));
-  await tester.scrollUntilVisible(fila, 160);
+  await tester.scrollUntilVisible(
+    fila,
+    160,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await tester.pumpAndSettle();
   await tester.tap(fila);
   await tester.pumpAndSettle();
   final editar = find.byKey(const ValueKey('editar-producto'));
@@ -66,7 +76,13 @@ void main() {
     await guardarFormulario(tester);
 
     final fila = find.byKey(const ValueKey('producto-P006'));
-    await tester.scrollUntilVisible(fila, 180);
+    await tester.scrollUntilVisible(
+      fila,
+      180,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.ensureVisible(fila);
+    await tester.pumpAndSettle();
     await tester.tap(fila);
     await tester.pumpAndSettle();
     expect(find.text('Café'), findsOneWidget);
@@ -111,7 +127,7 @@ void main() {
     expect(find.text('\$ 10.000 COP'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
-    await tester.pageBack();
+    await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
     final fila = find.byKey(const ValueKey('producto-P001'));
     await tester.ensureVisible(fila);
@@ -173,7 +189,7 @@ void main() {
       '10000',
     );
     await guardarFormulario(tester);
-    expect(find.text('Inventario'), findsOneWidget);
+    expect(find.byType(NavigationBar), findsOneWidget);
     expect(
       await resolverConsulta(tester, repositorio.obtenerTodos()),
       hasLength(6),
@@ -193,7 +209,17 @@ void main() {
       find.byKey(const ValueKey('costo-producto')),
       '6000',
     );
-    await tester.pageBack();
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('descartar-cambios')));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('Aceite de 1 litro'),
+      -160,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Detalle del producto'), findsOneWidget);

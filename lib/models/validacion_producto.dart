@@ -1,3 +1,6 @@
+import 'reglas_inventario.dart';
+import '../utils/entrada_importe.dart';
+
 class ValidacionProducto {
   static String? nombre(String? texto) {
     if (texto == null || texto.trim().isEmpty) {
@@ -7,22 +10,25 @@ class ValidacionProducto {
   }
 
   static double? leerImporte(String? texto) {
-    if (texto == null) return null;
-    return double.tryParse(texto.trim().replaceAll(',', '.'));
+    return EntradaImporte.leer(texto);
   }
 
   static String? costo(String? texto) {
     final valor = leerImporte(texto);
-    if (valor == null || !valor.isFinite) return 'Escribe un costo válido';
+    if (valor == null || !valor.isFinite) {
+      return EntradaImporte.error(texto, invalido: 'Escribe un costo válido');
+    }
     if (valor < 0) return 'El costo de compra no puede ser negativo';
-    return null;
+    return ReglasInventario.importe(texto);
   }
 
   static String? precio(String? texto) {
     final valor = leerImporte(texto);
-    if (valor == null || !valor.isFinite) return 'Escribe un precio válido';
+    if (valor == null || !valor.isFinite) {
+      return EntradaImporte.error(texto, invalido: 'Escribe un precio válido');
+    }
     if (valor < 0) return 'El precio de venta no puede ser negativo';
-    return null;
+    return ReglasInventario.importe(texto);
   }
 
   static void verificar({

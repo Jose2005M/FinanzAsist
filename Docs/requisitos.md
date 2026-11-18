@@ -83,9 +83,9 @@ Escenario: Retomar una compra después de una llamada
 | Contraste de la necesidad con usuarios reales | Pendiente. |
 | Incorporación al issue de HU-07 y a HU-07.feature del repositorio | Pendiente; este documento no modifica esos elementos. |
 | Revisión cruzada por una persona distinta del autor | Pendiente; registrar nombre y observaciones al realizarla. |
-| Implementación y prueba del nuevo escenario | Pendientes. |
+| Implementación y prueba del nuevo escenario | Borrador implementado; prueba de pausa y reanudación Flutter aprobada el 10 de noviembre de 2026. Llamada telefónica real pendiente. Véase `validacion-sprint1.md`. |
 
-Si el criterio se incorpora a los archivos de aceptación, el conjunto pasará de 19 a 20 escenarios. Documentarlo no significa que ya haya sido implementado o probado.
+Si el criterio se incorpora a los archivos de aceptación, el conjunto pasará de 19 a 20 escenarios. La implementación actual conserva el borrador mientras el formulario siga abierto y cuenta con una prueba del ciclo de vida; no se declara realizada una llamada real ni la recuperación después de finalizar el proceso.
 
 ## 5. Validación pendiente con usuarios reales
 
