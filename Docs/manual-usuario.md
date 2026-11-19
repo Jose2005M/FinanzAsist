@@ -69,7 +69,18 @@ Como propietario, abre **Cuenta de empresa → Usuarios de mi empresa**:
 - **Desactivar o activar:** confirma la desactivación. El empleado no podrá entrar y su siguiente operación con una sesión abierta será rechazada. Sus registros se conservan; puedes activarlo de nuevo.
 - **Restablecer contraseña:** asigna una contraseña nueva de 8 a 128 caracteres y comunícala al empleado por un medio seguro. La anterior deja de funcionar.
 
-La lista muestra nombre, correo, rol y estado **Activa/Desactivada**, con el propietario primero. No muestra contraseñas. Solo puedes gestionar empleados de tu empresa; no puedes modificar al propietario ni crear otro propietario desde esta pantalla. El antiguo administrador del dispositivo ya no existe.
+La lista muestra nombre, correo, rol y estado **Activa/Desactivada**, con el propietario primero. No muestra contraseñas. Solo puedes gestionar empleados de tu empresa; no puedes modificar al propietario ni crear otro propietario desde esta pantalla. El administrador del dispositivo se gestiona por separado.
+
+### Administrador del dispositivo
+
+Solo puede existir un administrador por teléfono. En la pantalla de acceso, **Crear administrador** aparece cuando hay al menos un propietario activo y todavía no existe administrador. Introduce el correo y la contraseña de un propietario activo para autorizar el alta, y luego el nombre, correo y contraseña del administrador. Su correo debe ser único en el dispositivo. Al terminar, se inicia su sesión.
+
+El administrador entra únicamente al panel **Usuarios del dispositivo**. Las cuentas se agrupan por empresa, con su propietario y trabajadores, mostrando nombre, correo, rol y estado **Activa/Desactivada**. Su propia cuenta aparece aparte como **Administrador (tú)**, sin acciones. No tiene negocio propio ni acceso a inventario, compras, ventas, gastos, reportes, respaldos o gestión de usuarios de una empresa.
+
+- **Desactivar o activar:** puede hacerlo sobre propietarios y trabajadores de cualquier empresa. Desactivar pide confirmación, conserva los datos y bloquea el acceso y la siguiente operación de una sesión abierta. Reactivar permite volver a usar la cuenta.
+- **Restablecer contraseña:** escribe dos veces una contraseña nueva de 8 a 128 caracteres y comunícala a la persona por un medio seguro. La anterior deja de funcionar y deberá iniciar sesión con la nueva.
+
+El administrador no crea usuarios, no cambia roles y no puede modificar su propia cuenta desde el panel. Nunca se muestran contraseñas, sales ni hashes. Usa **Cerrar sesión** para volver al acceso.
 
 El vendedor ve **Tus ventas**, con el nombre del responsable y sin costos ni utilidad. Las ventas conservan internamente su costo real para los reportes del propietario.
 

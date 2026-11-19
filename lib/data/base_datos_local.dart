@@ -11,7 +11,7 @@ class BaseDatosLocal {
     : factory = factory ?? databaseFactory;
 
   /// Versión del esquema que crea y entiende esta compilación.
-  static const version = 6;
+  static const version = 7;
   static const _auxiliares = ['-wal', '-shm', '-journal'];
 
   final DatabaseFactory factory;
@@ -44,6 +44,7 @@ class BaseDatosLocal {
           if (anterior < 4) await _crearGuias(db);
           if (anterior < 5) await _agregarRol(db);
           if (anterior < 6) await _usuariosPorEmpresa(db);
+          if (anterior < 7) await _administradorDispositivo(db);
         },
         onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
         onCreate: (db, version) async {
@@ -65,6 +66,7 @@ class BaseDatosLocal {
           await _crearGuias(db);
           await _agregarRol(db);
           await _usuariosPorEmpresa(db);
+          await _administradorDispositivo(db);
         },
       ),
     );
@@ -143,6 +145,52 @@ class BaseDatosLocal {
     }
     await db.execute(
       "CREATE UNIQUE INDEX IF NOT EXISTS un_propietario_por_empresa ON cuentas(empresa) WHERE rol = 'propietario'",
+    );
+  }
+
+  /// Versión 7: administrador único y roles de empresa.
+  Future<void> _administradorDispositivo(DatabaseExecutor db) async {
+    final esquema = await db.rawQuery(
+      "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'cuentas'",
+    );
+    if (!(esquema.single['sql'] as String).contains("'administrador'")) {
+      await db.execute('''CREATE TABLE cuentas_v7 (
+        id TEXT PRIMARY KEY,
+        empresa TEXT NOT NULL,
+        usuario TEXT NOT NULL,
+        nombre_empresa TEXT NOT NULL,
+        nombre TEXT NOT NULL,
+        correo TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        sal TEXT NOT NULL,
+        hash TEXT NOT NULL,
+        iteraciones INTEGER NOT NULL CHECK(iteraciones >= 600000),
+        activa INTEGER NOT NULL DEFAULT 1 CHECK(activa IN (0, 1)),
+        rol TEXT NOT NULL DEFAULT 'propietario'
+          CHECK(rol IN ('propietario', 'encargado', 'vendedor', 'consulta', 'administrador')),
+        FOREIGN KEY(empresa, usuario) REFERENCES usuarios(empresa, id)
+      )''');
+      await db.execute(
+        '''INSERT INTO cuentas_v7
+        (id, empresa, usuario, nombre_empresa, nombre, correo, sal, hash, iteraciones, activa, rol)
+        SELECT id, empresa, usuario, nombre_empresa, nombre, correo, sal, hash, iteraciones, activa, rol FROM cuentas''',
+      );
+      // foreign_keys=OFF no surte efecto dentro de una transacción, y diferir
+      // las FK tampoco basta: al borrar `cuentas` cada guía cuenta como una
+      // violación que la tabla renombrada no compensa y el COMMIT falla.
+      // Se apartan las guías, se reconstruye su tabla padre y se reinsertan.
+      final guias = await db.query('guias_vistas');
+      await db.delete('guias_vistas');
+      await db.execute('DROP TABLE cuentas');
+      await db.execute('ALTER TABLE cuentas_v7 RENAME TO cuentas');
+      for (final guia in guias) {
+        await db.insert('guias_vistas', guia);
+      }
+    }
+    await db.execute(
+      "CREATE UNIQUE INDEX IF NOT EXISTS un_propietario_por_empresa ON cuentas(empresa) WHERE rol = 'propietario'",
+    );
+    await db.execute(
+      "CREATE UNIQUE INDEX IF NOT EXISTS un_administrador ON cuentas(rol) WHERE rol = 'administrador'",
     );
   }
 

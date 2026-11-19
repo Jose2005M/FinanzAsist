@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  for (final rol in RolCuenta.values) {
+  for (final rol in [RolCuenta.propietario, ...RolCuenta.empleados]) {
     testWidgets('pestañas y acciones de ${rol.name}', (tester) async {
       await tester.pumpWidget(
         MaterialApp(

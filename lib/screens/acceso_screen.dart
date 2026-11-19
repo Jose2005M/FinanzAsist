@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data/autenticacion_local.dart';
+import 'crear_administrador_screen.dart';
 import '../widgets/acciones_respaldo.dart';
 
 import '../widgets/marca_finanzasist.dart';
@@ -33,6 +34,31 @@ class _AccesoScreenState extends State<AccesoScreen> {
   bool _verClave = false;
   String? _error;
   bool _restaurando = false;
+  late Future<bool> _administradorDisponible = _consultarAdministrador();
+
+  Future<bool> _consultarAdministrador() async {
+    try {
+      return await widget.autenticacion.puedeCrearAdministrador();
+    } on Exception {
+      return false;
+    }
+  }
+
+  Future<void> _crearAdministrador() async {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) =>
+            CrearAdministradorScreen(autenticacion: widget.autenticacion),
+      ),
+    );
+    if (mounted) {
+      // Cuerpo de bloque: una flecha devolvería el Future a setState.
+      setState(() {
+        _administradorDisponible = _consultarAdministrador();
+      });
+    }
+  }
+
   late Future<bool> _restaurable = _consultarRestauracion();
   Future<bool> _consultarRestauracion() async {
     final respaldo = widget.respaldo;
@@ -54,6 +80,7 @@ class _AccesoScreenState extends State<AccesoScreen> {
     setState(() {
       _restaurando = false;
       _restaurable = _consultarRestauracion();
+      _administradorDisponible = _consultarAdministrador();
     });
     if (restaurado && _registro) _cambiarModo();
   }
@@ -212,6 +239,20 @@ class _AccesoScreenState extends State<AccesoScreen> {
                           const SizedBox(height: 24),
                           _informacionLocal(),
                           _opcionRestaurar(),
+                          FutureBuilder<bool>(
+                            future: _administradorDisponible,
+                            builder: (context, estado) => estado.data == true
+                                ? TextButton(
+                                    key: const ValueKey(
+                                      'crear-administrador-acceso',
+                                    ),
+                                    onPressed: _ocupado || _restaurando
+                                        ? null
+                                        : _crearAdministrador,
+                                    child: const Text('Crear administrador'),
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
                         ],
                       ),
                     ),

@@ -1,5 +1,5 @@
-/// Acciones protegidas dentro de una empresa (HU-03). Consultar el inventario
-/// y los precios de venta está permitido a todos los roles.
+/// Acciones protegidas (HU-03). Todos los roles de empresa pueden consultar
+/// el inventario y los precios de venta; el administrador solo gestiona cuentas.
 enum Permiso {
   verCostos,
   gestionarProductos,
@@ -14,14 +14,16 @@ enum Permiso {
   verReportes,
   gestionarUsuarios,
   gestionarRespaldos,
+  administrarDispositivo,
 }
 
-/// Rol de una cuenta dentro de su empresa. Cada empresa tiene un propietario.
+/// Rol de empresa o de administración del dispositivo.
 enum RolCuenta {
   propietario('Propietario'),
   encargado('Encargado de inventario'),
   vendedor('Vendedor'),
-  consulta('Consulta');
+  consulta('Consulta'),
+  administrador('Administrador del dispositivo');
 
   const RolCuenta(this.etiqueta);
   final String etiqueta;
@@ -39,7 +41,9 @@ enum RolCuenta {
   };
 
   Set<Permiso> get permisos => switch (this) {
-    propietario => Permiso.values.toSet(),
+    propietario =>
+      Permiso.values.toSet()..remove(Permiso.administrarDispositivo),
+    administrador => {Permiso.administrarDispositivo},
     encargado => {
       ..._lectura,
       Permiso.gestionarProductos,
@@ -54,6 +58,8 @@ enum RolCuenta {
 
   /// Breve descripción para elegir el rol al crear un usuario.
   String get descripcion => switch (this) {
+    administrador =>
+      'Gestiona las cuentas del dispositivo sin acceder a negocios.',
     propietario => 'Puede todo: usuarios, gastos y respaldos.',
     encargado =>
       'Ve todo; registra productos, existencias y compras. No vende ni '

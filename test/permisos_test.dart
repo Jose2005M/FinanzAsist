@@ -42,6 +42,7 @@ void main() {
     },
     Permiso.gestionarUsuarios: {RolCuenta.propietario},
     Permiso.gestionarRespaldos: {RolCuenta.propietario},
+    Permiso.administrarDispositivo: {RolCuenta.administrador},
   };
 
   test('la matriz cubre todos los permisos', () {
@@ -58,6 +59,7 @@ void main() {
 
   test('el propietario no se asigna a empleados', () {
     expect(RolCuenta.empleados, isNot(contains(RolCuenta.propietario)));
+    expect(RolCuenta.empleados, isNot(contains(RolCuenta.administrador)));
     expect(RolCuenta.empleados, hasLength(3));
   });
 }

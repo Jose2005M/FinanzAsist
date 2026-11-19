@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../data/autenticacion_local.dart';
+import '../data/administracion_dispositivo.dart';
+import 'administracion_screen.dart';
 import '../data/repositorio_sqlite.dart';
 import '../data/usuarios_empresa.dart';
 import '../widgets/permisos_sesion.dart';
@@ -27,6 +29,17 @@ class SesionScreen extends StatelessWidget {
       final sesion = autenticacion.sesion;
       if (sesion == null) {
         return AccesoScreen(autenticacion: autenticacion, respaldo: respaldo);
+      }
+      if (sesion.esAdministrador) {
+        return AdministracionScreen(
+          key: ValueKey(sesion),
+          administracion: AdministracionDispositivo(
+            base: autenticacion.base,
+            sesion: sesion,
+          ),
+          administrador: CuentaResumen.deSesion(sesion),
+          cerrarSesion: autenticacion.cerrarSesion,
+        );
       }
       return _AreaEmpresa(
         key: ValueKey(sesion),

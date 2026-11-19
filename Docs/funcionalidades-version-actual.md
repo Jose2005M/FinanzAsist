@@ -158,7 +158,7 @@ Esta versión cuenta con implementación local de HU-01, HU-02, HU-04, HU-05, HU
 
 | Historia | Estado | Funcionalidad por completar |
 | --- | --- | --- |
-| HU-03 | Implementada localmente | Usuarios por empresa con propietario, encargado de inventario, vendedor y consulta. El propietario gestiona empleados, gastos y respaldos; el encargado registra productos, existencias y compras; el vendedor registra y consulta solo sus ventas, sin costos; consulta solo lee. Permisos verificados en SQLite y reflejados en la interfaz. |
+| HU-03 | Implementada localmente | Usuarios por empresa con propietario, encargado de inventario, vendedor y consulta. El propietario gestiona empleados, gastos y respaldos; el encargado registra productos, existencias y compras; el vendedor registra y consulta solo sus ventas, sin costos; consulta solo lee. Administrador único del dispositivo, autorizado por un propietario activo: panel por empresa para activar/desactivar y restablecer claves de propietarios y trabajadores, sin acceso a datos de negocio ni respaldos. Permisos verificados en SQLite y reflejados en la interfaz; esquema v7 conserva cuentas y guías de v6. |
 | HU-11 | Pendiente | Crear categorías y subcategorías y filtrar por ellas. |
 | HU-12 | Pendiente | Clientes, asociación con ventas e historial por cliente. |
 | HU-13 | Pendiente | Proveedores, asociación con compras y consultas por proveedor. |

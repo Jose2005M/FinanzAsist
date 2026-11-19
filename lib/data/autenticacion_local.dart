@@ -70,6 +70,27 @@ class DatosRegistro {
   }
 }
 
+class DatosAdministrador {
+  const DatosAdministrador({
+    required this.nombre,
+    required this.correo,
+    required this.clave,
+  });
+  final String nombre;
+  final String correo;
+  final String clave;
+
+  void validar() {
+    for (final error in [
+      DatosRegistro.validarNombre(nombre, 'el nombre del administrador', 100),
+      DatosRegistro.validarCorreo(correo),
+      DatosRegistro.validarClave(clave),
+    ]) {
+      if (error != null) throw AccesoException(error);
+    }
+  }
+}
+
 /// Solo AutenticacionLocal puede emitir una sesión. Se revoca en memoria
 /// y se verifica contra la cuenta dentro de cada transacción.
 class SesionEmpresa {
@@ -80,6 +101,7 @@ class SesionEmpresa {
       empresa = row['nombre_empresa'] as String,
       propietario = row['nombre'] as String,
       correo = row['correo'] as String,
+      _hash = row['hash'] as String,
       rol = RolCuenta.values.byName(row['rol'] as String);
 
   final String cuentaId;
@@ -89,7 +111,10 @@ class SesionEmpresa {
   final String propietario;
   final String correo;
   final RolCuenta rol;
+  final String _hash;
   bool _activa = true;
+
+  bool get esAdministrador => rol == RolCuenta.administrador;
 
   bool puede(Permiso permiso) => rol.permite(permiso);
 
@@ -98,12 +123,22 @@ class SesionEmpresa {
       throw const AccesoException('Tu sesión terminó. Inicia sesión.');
     }
 
+    if (esAdministrador && permiso != Permiso.administrarDispositivo) {
+      throw const AccesoException(
+        'La cuenta de administrador no accede a los datos de los negocios.',
+      );
+    }
+    if (permiso == Permiso.administrarDispositivo && !esAdministrador) {
+      throw const AccesoException(
+        'Solo el administrador puede gestionar las cuentas.',
+      );
+    }
+
     final cuentas = await db.query(
       'cuentas',
       columns: ['id'],
-      where:
-          'id = ? AND empresa = ? AND usuario = ? AND rol = ? AND activa = 1',
-      whereArgs: [cuentaId, empresaId, usuarioId, rol.name],
+      where: 'id = ? AND empresa = ? AND usuario = ? AND rol = ? AND activa = 1 AND hash = ?',
+      whereArgs: [cuentaId, empresaId, usuarioId, rol.name, _hash],
     );
     if (!_activa || cuentas.isEmpty) {
       throw const AccesoException('Tu sesión no es válida. Inicia sesión.');
@@ -119,6 +154,10 @@ class AutenticacionLocal extends ChangeNotifier {
   final BaseDatosLocal base;
   static const iteraciones = Claves.iteraciones;
   static const _correoEnUso = 'Este correo ya tiene una cuenta. Inicia sesión.';
+  static const _propietarioIncorrecto =
+      'Correo o contraseña del propietario incorrectos.';
+  static const _yaHayAdministrador =
+      'Ya existe un administrador en este dispositivo.';
   SesionEmpresa? _sesion;
   SesionEmpresa? get sesion => _sesion;
   bool _ocupada = false;
@@ -158,6 +197,14 @@ class AutenticacionLocal extends ChangeNotifier {
         where: 'correo = ?',
         whereArgs: [correo],
       )).isNotEmpty;
+
+  Future<int> _contar(DatabaseExecutor db, RolCuenta rol) async =>
+      Sqflite.firstIntValue(
+        await db.rawQuery('SELECT COUNT(*) FROM cuentas WHERE rol = ?', [
+          rol.name,
+        ]),
+      ) ??
+      0;
 
   Future<void> registrar(DatosRegistro datos) => _ejecutar(() async {
     datos.validar();
@@ -228,6 +275,81 @@ class AutenticacionLocal extends ChangeNotifier {
     return cuenta;
   }
 
+  /// El administrador se crea una sola vez y con la autorización de un
+  /// propietario activo, para que nadie más pueda ver las cuentas.
+  Future<bool> puedeCrearAdministrador() async {
+    final db = await base.abrir;
+    return (await db.query(
+          'cuentas',
+          columns: ['id'],
+          where: "rol = 'propietario' AND activa = 1",
+          limit: 1,
+        )).isNotEmpty &&
+        await _contar(db, RolCuenta.administrador) == 0;
+  }
+
+  Future<void> crearAdministrador(
+    DatosAdministrador datos, {
+    required String correoPropietario,
+    required String clavePropietario,
+  }) => _ejecutar(() async {
+    datos.validar();
+    final correo = DatosRegistro.normalizarCorreo(datos.correo);
+    final db = await base.abrir;
+    if (await _contar(db, RolCuenta.administrador) > 0) {
+      throw const AccesoException(_yaHayAdministrador);
+    }
+    final filas = await db.query(
+      'cuentas',
+      where: 'correo = ? AND rol = ?',
+      whereArgs: [
+        DatosRegistro.normalizarCorreo(correoPropietario),
+        RolCuenta.propietario.name,
+      ],
+    );
+    final duenio = filas.isEmpty ? null : filas.single;
+    final valida = await Claves.coincide(clavePropietario, duenio);
+    if (duenio == null || !valida || duenio['activa'] != 1) {
+      throw const AccesoException(_propietarioIncorrecto);
+    }
+    if (await _correoRegistrado(db, correo)) {
+      throw const AccesoException(_correoEnUso);
+    }
+    final clave = await Claves.nueva(datos.clave);
+    return db.transaction((tx) async {
+      if (await _contar(tx, RolCuenta.administrador) > 0) {
+        throw const AccesoException(_yaHayAdministrador);
+      }
+      if (await _correoRegistrado(tx, correo)) {
+        throw const AccesoException(_correoEnUso);
+      }
+      final autorizante = await tx.query(
+        'cuentas',
+        columns: ['id'],
+        where: 'id = ? AND rol = ? AND activa = 1 AND hash = ? AND sal = ?',
+        whereArgs: [
+          duenio['id'],
+          RolCuenta.propietario.name,
+          duenio['hash'],
+          duenio['sal'],
+        ],
+      );
+      if (autorizante.isEmpty) {
+        throw const AccesoException(_propietarioIncorrecto);
+      }
+      // La empresa propia del administrador nunca tiene datos de negocio.
+      return _insertarCuenta(
+        tx,
+        empresaId: nuevoId(),
+        nombreEmpresa: 'Administración',
+        nombre: datos.nombre.trim(),
+        correo: correo,
+        clave: clave,
+        rol: RolCuenta.administrador,
+      );
+    });
+  });
+
   Future<void> iniciarSesion(
     String correo,
     String clave,
@@ -252,7 +374,7 @@ class AutenticacionLocal extends ChangeNotifier {
     // Solo quien conoce la contraseña sabe que la cuenta está desactivada.
     if (cuenta['activa'] != 1) {
       throw const AccesoException(
-        'Esta cuenta está desactivada. Pide al propietario que la active.',
+        'Esta cuenta está desactivada. Pide al propietario o al administrador del dispositivo que la active.',
       );
     }
     final actuales = await db.query(

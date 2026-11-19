@@ -137,7 +137,7 @@ void main() {
       await (await base.abrir).rawQuery(
         "SELECT name FROM sqlite_master WHERE name = 'un_administrador'",
       ),
-      isEmpty,
+      hasLength(1),
     );
   });
 }

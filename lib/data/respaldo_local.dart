@@ -155,6 +155,11 @@ class RespaldoLocal {
       (await db.query('cuentas', columns: ['id'], limit: 1)).isNotEmpty;
 
   Future<void> _autorizar(SesionEmpresa? sesion) async {
+    if (sesion?.esAdministrador ?? false) {
+      throw const RespaldoException(
+        'El administrador del dispositivo no puede exportar ni restaurar respaldos.',
+      );
+    }
     final db = await base.abrir;
     if (!await _hayCuentas(db)) return;
     if (sesion == null) {
