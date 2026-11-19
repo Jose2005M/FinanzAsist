@@ -1,19 +1,118 @@
 import 'dart:async';
+import 'dart:convert';
 
 import '../models/producto.dart';
 import '../models/validacion_producto.dart';
+import '../models/operacion.dart';
+import '../models/gasto.dart';
+import '../models/reporte_financiero.dart';
+import '../models/reglas_inventario.dart';
+import 'negocio_repository.dart';
 import 'producto_repository.dart';
 
-class RepositorioSimulado implements ProductoRepository {
+class RepositorioSimulado implements NegocioRepository {
   RepositorioSimulado({
     this.retardo = const Duration(milliseconds: 1500),
     List<Producto>? productosIniciales,
-  }) : _ejemplos = List<Producto>.unmodifiable(
+    DateTime Function()? reloj,
+  }) : _reloj = reloj ?? DateTime.now,
+       _ejemplos = List<Producto>.unmodifiable(
          productosIniciales ?? productosEjemplo,
        ),
        _productos = List<Producto>.of(productosIniciales ?? productosEjemplo);
 
   final Duration retardo;
+  final DateTime Function() _reloj;
+  @override
+  String get empresaId => 'negocio-local';
+  @override
+  String get usuarioId => 'usuario-demo';
+  final List<Operacion> _operaciones = [];
+  final List<MovimientoInventario> _movimientos = [];
+  final List<Gasto> _gastos = [];
+
+  @override
+  Future<Gasto> registrarGasto(SolicitudGasto solicitud) async {
+    final gasto = solicitud.confirmar(
+      empresaId: empresaId,
+      usuarioId: usuarioId,
+      registradoEn: _reloj(),
+    );
+    await Future<void>.delayed(retardo);
+    for (final previo in _gastos) {
+      if (previo.id == gasto.id) {
+        if (!previo.mismosDatos(gasto)) {
+          throw const ReglaNegocioException(
+            'El identificador ya corresponde a otro gasto',
+          );
+        }
+        return previo;
+      }
+    }
+    _gastos.add(gasto);
+    return gasto;
+  }
+
+  @override
+  Future<List<Gasto>> obtenerGastos({PeriodoReporte? periodo}) async =>
+      List.unmodifiable(
+        _gastos.reversed
+            .where((g) => periodo == null || periodo.incluyeDia(g.fecha))
+            .toList()
+          ..sort((a, b) => b.fecha.compareTo(a.fecha)),
+      );
+
+  @override
+  Future<ReporteFinanciero> obtenerReporte(PeriodoReporte periodo) async =>
+      ReporteFinanciero.calcular(
+        periodo: periodo,
+        empresaId: empresaId,
+        operaciones: List.of(_operaciones),
+        gastos: List.of(_gastos),
+      );
+
+  @override
+  Future<Operacion> confirmarOperacion(SolicitudOperacion solicitud) async {
+    await Future<void>.delayed(retardo);
+    for (final previa in _operaciones) {
+      if (previa.id == solicitud.id) {
+        if (jsonEncode(previa.solicitud.toJson()) !=
+            jsonEncode(solicitud.toJson())) {
+          throw const ReglaNegocioException(
+            'El identificador ya corresponde a otra operación',
+          );
+        }
+        return previa;
+      }
+    }
+    final resultado = ReglasInventario.aplicar(
+      solicitud: solicitud,
+      productos: _productos,
+      movimientos: _movimientos,
+      empresaId: empresaId,
+      usuarioId: usuarioId,
+      fecha: _reloj().toUtc(),
+    );
+    _productos = resultado.productos;
+    _operaciones.add(resultado.operacion);
+    _movimientos.addAll(resultado.movimientos);
+    return resultado.operacion;
+  }
+
+  @override
+  Future<List<Operacion>> obtenerOperaciones({TipoOperacion? tipo}) async =>
+      List.unmodifiable(
+        _operaciones.reversed.where((o) => tipo == null || o.tipo == tipo),
+      );
+
+  @override
+  Future<List<MovimientoInventario>> obtenerMovimientos({
+    String? productoId,
+  }) async => List.unmodifiable(
+    _movimientos.reversed.where(
+      (m) => productoId == null || m.productoId == productoId,
+    ),
+  );
 
   // Datos ficticios. Este repositorio no almacena información en el disco.
   static const productosEjemplo = <Producto>[
@@ -65,6 +164,9 @@ class RepositorioSimulado implements ProductoRepository {
 
   @override
   void seleccionarEscenario(EscenarioInventario escenario) {
+    _operaciones.clear();
+    _movimientos.clear();
+    _gastos.clear();
     _escenario = escenario;
     _fallarSiguienteConsulta = escenario == EscenarioInventario.error;
 
@@ -163,6 +265,7 @@ class RepositorioSimulado implements ProductoRepository {
       cantidad: anterior.cantidad,
       costoCompra: costoCompra,
       precioVenta: precioVenta,
+      empresaId: anterior.empresaId,
     );
     _productos[indice] = actualizado;
     _escenario = EscenarioInventario.conDatos;

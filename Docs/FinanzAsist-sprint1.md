@@ -1,5 +1,7 @@
 # Examen práctico · Sprint 1 · FinanzAsist · Flutter + Dart
 
+Continuación de desarrollo: los costos históricos de HU-09, gastos de HU-10 y reportes de HU-14 se documentan en [validacion-finanzas.md](validacion-finanzas.md). Las cifras de pruebas de este documento conservan el corte original de Sprint 1.
+
 **Equipo y proyecto:** Los Juanchos · FinanzAsist · Ingeniería Informática, UNIPAZ.
 
 - **Product Owner:** Jose Manuel Torres Neira.
@@ -287,137 +289,80 @@ La implementación del parcial comienza con HU-05: lista del inventario, estados
 
 **Estado de validación:** los requisitos de calidad son metas verificables. Sus resultados se registrarán después de ejecutar la aplicación y realizar las mediciones.
 
-## 4. Prueba técnica · Flutter + Dart
+## 4. Implementación y validación técnica · 10 de noviembre de 2026
 
-### Estado actual del trabajo
+El alcance implementado comprende HU-04, HU-05, HU-06, HU-07 y HU-08. La referencia principal son los 19 escenarios vigentes en `Docs/criterios/`. Los 15 ejemplos de la sección 2 conservan su valor como escenarios complementarios de exploración; no reemplazan esos archivos. El diagnóstico inicial encontró catálogo e inventario simulados funcionales y ausencia de ajustes, compras, ventas y persistencia.
 
-- **Rama de trabajo:** `examen/sprint1-tecnico`, creada y activa según la salida de Git compartida.
-- **Destino del pull request:** `main`.
-- **Pull request:** pendiente de crear y registrar su enlace; se entregará abierto, sin fusionar.
-- **Issue vinculado:** pendiente de registrar el enlace del issue correspondiente a HU-05.
-- **Elemento INV «Prueba técnica del examen»:** pendiente de comprobar su creación y estado en el tablero.
-- **Documento en `main`:** pendiente de comprobar que esta versión esté guardada en la ruta de entrega.
+### Entorno comprobado
 
-| Componente | Información comprobada |
+| Componente | Resultado |
 | --- | --- |
-| Flutter | Versión 3.47.1, canal estable. |
-| Dart | Versión 3.13.1. |
-| Sistema del computador | Windows 11, versión 25H2, arquitectura x64. |
-| Proyecto | Creado con `flutter create --project-name finanzasist --platforms=android,web .`; dependencias descargadas. |
-| Ejecución en Chrome | Confirmada por el equipo: abre la aplicación de ejemplo y funciona el contador. |
-| Dispositivo Android de desarrollo | Emulador con perfil Pixel 5; Flutter lo identifica como `sdk gphone16k x86 64`, Android 16 (API 36). |
-| Identificador del emulador | `emulator-5554`, detectado por `flutter devices`. |
-| Ejecución en Android | Se inició con `flutter run -d emulator-5554`. La última evidencia muestra `Running Gradle task 'assembleDebug'...`; instalación y funcionamiento final pendientes de confirmar. |
-| Prueba en teléfono Android físico | Pendiente de realizar y registrar el dispositivo utilizado. |
+| Rama | `examen/sprint1-tecnico`, sin cambios ajenos al iniciar. |
+| SDK | Flutter 3.47.1, Dart 3.13.1. |
+| Dispositivo | Pixel 5, `emulator-5554`, `sdk gphone16k x86 64`, Android 16, API 36. |
+| Compilación | `flutter build apk --debug` completado; APK en `build/app/outputs/flutter-apk/app-debug.apk`. |
+| Ejecución | Prueba de integración Android completa aprobada; instalación y arranque normal con `flutter run -d emulator-5554 --no-resident` completados. |
+| Android físico | Pendiente de validación por el equipo. |
 
-### Alcance técnico previsto
+### Arquitectura implementada
 
-La primera implementación corresponde a la consulta de existencias de HU-05: una lista de productos y el detalle del producto solicitado por su identificador. La pantalla de lista tendrá los estados de **cargando, vacío, error y con datos**, con un selector de escenarios visible durante el desarrollo.
+Se conserva MVVM: las pantallas representan el estado y reciben la interacción, los ViewModels coordinan las operaciones, los modelos contienen datos y reglas compartidas y los repositorios consultan y modifican información.
 
-Las cinco historias seleccionadas conservan sus criterios de aceptación en la sección 2. Su cumplimiento se marcará conforme se implementen y comprueben sus funcionalidades.
-
-**Modelo previsto `Producto`, con cinco campos:**
-
-| Campo | Tipo previsto | Qué representa |
-| --- | --- | --- |
-| `id` | `String` | Identificador único del producto. |
-| `nombre` | `String` | Nombre con el que se identifica el producto. |
-| `existencias` | `int` | Cantidad de unidades disponibles. |
-| `costoCompra` | `int` | Costo de compra unitario, expresado en pesos colombianos enteros para los datos de prueba. |
-| `precioVenta` | `int` | Precio de venta unitario, expresado en pesos colombianos enteros para los datos de prueba. |
-
-**Cinco registros simulados propuestos:** los valores son ficticios y se usarán para comprobar la interfaz; no corresponden a precios comerciales investigados ni a registros reales de una empresa.
-
-| id | nombre | existencias | costoCompra (COP) | precioVenta (COP) |
-| --- | --- | ---: | ---: | ---: |
-| P001 | Arroz de 1 kg | 20 | 3500 | 4500 |
-| P002 | Aceite de 1 litro | 12 | 7000 | 9000 |
-| P003 | Azúcar de 1 kg | 15 | 3000 | 4000 |
-| P004 | Leche de 1 litro | 18 | 3200 | 4000 |
-| P005 | Jabón en barra | 8 | 2000 | 3000 |
-
-Cada escenario de aceptación preparará los valores que indique su cláusula Dado. Las pruebas se ejecutarán con datos iniciales independientes para que una compra, una venta o un ajuste anterior no alteren el escenario siguiente. Para medir RC-01 se preparará un conjunto independiente de 200 productos; la lista de demostración conservará los cinco registros anteriores.
-
-El repositorio simulado incorporará un retardo de **1,5 segundos** en los escenarios con datos, vacío y error. El escenario de cargando permitirá mantener el indicador visible para su comprobación y captura. Los datos del repositorio simulado se utilizarán para esta prueba; el almacenamiento definitivo se atenderá mediante TEC-02.
-
-### Organización prevista del código
-
-La arquitectura separará pantalla, ViewModel y repositorio. La pantalla representará el estado y recibirá las acciones del usuario; el ViewModel gestionará ese estado y solicitará los datos al repositorio.
-
-| Archivo o carpeta | Función prevista | Estado al preparar este documento |
-| --- | --- | --- |
-| `lib/main.dart` | Iniciar FinanzAsist y configurar sus dependencias y navegación. | Generado; contiene la aplicación de ejemplo. Adaptación pendiente. |
-| `lib/domain/producto.dart` | Definir el modelo `Producto` y sus cinco campos. | Pendiente de crear. |
-| `lib/data/producto_repository.dart` | Definir el contrato para consultar productos y obtener uno por su identificador. | Pendiente de crear. |
-| `lib/data/repositorio_simulado.dart` | Entregar cinco productos y simular cargando, vacío, error y con datos. | Pendiente de crear. |
-| `lib/ui/inventario/inventario_viewmodel.dart` | Gestionar los cuatro estados de la lista, la carga y el reintento. | Pendiente de crear. |
-| `lib/ui/inventario/pantalla_inventario.dart` | Mostrar la lista con nombre, existencias y precio de venta y representar los cuatro estados. | Pendiente de crear. |
-| `lib/ui/inventario/selector_escenario.dart` | Permitir cambiar de escenario durante el desarrollo. | Pendiente de crear. |
-| `lib/ui/detalle/detalle_viewmodel.dart` | Consultar el producto por su id y gestionar el resultado o el error del detalle. | Pendiente de crear. |
-| `lib/ui/detalle/pantalla_detalle.dart` | Mostrar los datos del producto solicitado y permitir regresar a la lista. | Pendiente de crear. |
-| `test/` | Comprobar los escenarios y la adaptación de las pantallas implementadas. | Se generó `widget_test.dart` de ejemplo; pruebas del negocio pendientes de preparar y ejecutar. |
-
-Los archivos para registrar y actualizar productos, existencias iniciales, ajustes, compras y ventas se añadirán al implementar HU-04, HU-06, HU-07 y HU-08. Los nombres definitivos y su estado se actualizarán en esta tabla según el código realmente creado.
-
-### Analizador y pruebas automáticas
-
-- **Analizador (`flutter analyze`):** pendiente de ejecutar y registrar la salida.
-- **Pruebas (`flutter test`):** pendiente de preparar las pruebas del negocio, ejecutarlas y registrar la salida.
-- **RC-01, tiempo con 200 productos:** pendiente de realizar las tres mediciones y registrar las condiciones del equipo.
-- **RC-02, adaptación a 360 dp:** pendiente de comprobar en las pantallas implementadas y guardar la evidencia.
-
-El resultado satisfactorio de los comandos se anotará después de ejecutarlos. La prueba del contador confirma el arranque del proyecto en Chrome; la validación de las funciones de FinanzAsist requiere sus propias pruebas.
-
-### Evidencias por incorporar
-
-| Evidencia | Estado |
+| Ruta real | Responsabilidad |
 | --- | --- |
-| Captura del estado cargando de la lista | Pendiente. |
-| Captura del estado vacío de la lista | Pendiente. |
-| Captura del estado de error con la opción Reintentar | Pendiente. |
-| Captura de la lista con los cinco productos | Pendiente. |
-| Verificación del detalle del producto y regreso a la lista | Pendiente. |
-| Verificación de los contenidos con un ancho de 360 dp | Pendiente. |
-| Enlace del PR con las cuatro capturas de los estados | Pendiente. |
-| Registro de quién manejó el dispositivo durante la comprobación | Pendiente; debe ser una persona distinta de quien programó la parte comprobada. |
+| `lib/main.dart` | Tema y configuración del repositorio persistente o de demostración. |
+| `lib/models/` | Producto por empresa, operación, detalle histórico, movimiento y validaciones compartidas. |
+| `lib/data/producto_repository.dart` | Contrato del catálogo existente. |
+| `lib/data/negocio_repository.dart` | Contrato común de compras, ventas y movimientos. |
+| `lib/data/repositorio_sqlite.dart` | Persistencia transaccional, comprobación de saldos e idempotencia por empresa. |
+| `lib/data/repositorio_simulado.dart` | Cinco productos ficticios, retardo de 1,5 segundos y selector de estados para desarrollo. |
+| `lib/viewmodels/` | Inventario, detalle, operación y historial. |
+| `lib/screens/` | Inventario, catálogo, detalle, apertura, ajuste, compra, venta e historial. |
+| `test/` | Pruebas de catálogo, reglas, SQLite e interfaz a 360 dp. |
+| `integration_test/sprint1_test.dart` | Recorrido completo Android con SQLite y empresa de prueba independiente. |
 
-### Cumplimiento de los escenarios
+`Producto` conserva `id`, `nombre`, `cantidad`, `costoCompra` y `precioVenta`, y añade `empresaId`. Se preserva la API monetaria del catálogo con `double`; los cálculos de operaciones y el almacenamiento usan centavos enteros. El formulario acepta máximo dos decimales.
 
-Esta tabla refleja la situación previa al desarrollo de las funciones del negocio. Se utiliza **No** para señalar funcionalidades pendientes de implementación y comprobación. Todavía no hay resultados de ejecución de estos escenarios. Se actualizará cada fila con **sí, no o aún no aplica**, su justificación y su evidencia después de probarla.
+La lista de demostración conserva los datos implementados por el equipo: P001 Arroz (20), P002 Aceite (12), P003 Azúcar (15), P004 Leche (18) y P005 Jabón (0, agotado). Estos valores son ficticios. Android inicia vacío en modo persistente; no copia automáticamente los ejemplos a una base real.
 
-| Historia y escenario | ¿Cumple? | Motivo o evidencia |
+### Almacenamiento y reglas
+
+SQLite almacena empresas, usuarios locales, productos, operaciones, detalles y movimientos. Cada escritura de operación y sus cambios de existencias se confirman en una sola transacción; un error revierte todo. El mismo identificador de confirmación no aplica de nuevo el movimiento, incluso después de reabrir la base. El detalle y la lista se actualizan al regresar de cada operación.
+
+Una apertura se permite una sola vez, cuando el producto no tiene movimientos. Los ajustes exigen motivo y no permiten saldos negativos. Compras y ventas admiten varios productos; una línea inválida impide confirmar todo el documento. El descuento de venta es un importe entre cero y el subtotal. Los precios cobrados y los costos de compra se conservan en el detalle histórico.
+
+La empresa y el usuario iniciales son `negocio-local` y `administrador-local`. Las consultas y las relaciones están separadas por empresa, pero esta sesión de desarrollo no implementa autorización real. TEC-02 queda parcialmente atendido: faltan gastos y la integración con HU-01 a HU-03. No se implementó sincronización ni un método FIFO/promedio ponderado de HU-09.
+
+### Pruebas y criterios cubiertos
+
+- `dart format lib test integration_test test_driver`: ejecutado.
+- `flutter analyze`: sin observaciones.
+- `flutter test`: 59 pruebas aprobadas.
+- `flutter build apk --debug`: compilación completada.
+- `flutter build web --debug`: compilación completada del modo de demostración.
+- `flutter test integration_test/sprint1_test.dart -d emulator-5554`: 1 prueba aprobada; crea producto, registra 20 iniciales, ajusta a 10, compra 5, vende 4 y recupera 11 al reabrir SQLite.
+- El recorrido se repitió con `flutter drive` y siete capturas internas de Flutter revisadas; tres están en `Docs/evidencias/sprint1/`. Android System UI mostró un aviso de bloqueo persistente, por lo que la revisión manual del emulador y el teclado nativo siguen limitados. Véase el informe de validación.
+- RC-02: las pruebas de widgets cubren los cuatro estados, nombres largos, detalle, formularios y resumen a 360 dp; incluyen espacio de teclado simulado.
+- RC-01: siguen pendientes las tres mediciones de 200 productos en el Android del equipo.
+
+| Historia | Criterios vigentes | Evidencia |
 | --- | --- | --- |
-| HU-05 · Consultar el inventario con productos disponibles | No | Pendiente de implementar la lista y comprobar los cinco productos. |
-| HU-05 · Falla la consulta del inventario | No | Pendiente de implementar el error simulado y la opción Reintentar. |
-| HU-05 · Consultar un inventario vacío desde el teléfono | No | Pendiente de implementar el estado vacío y verificar la acción Registrar producto. |
-| HU-04 · Actualizar el costo y el precio de un producto | No | Pendiente de implementar la actualización y comprobar los valores 3500 y 4500 pesos. |
-| HU-04 · Intentar registrar un producto con costo negativo | No | Pendiente de implementar la validación y comprobar que se conserven cinco productos. |
-| HU-04 · Evitar un registro duplicado por doble envío en el teléfono | No | Pendiente de implementar el registro y comprobar que se cree una sola entrada. |
-| HU-06 · Ajustar las existencias e indicar el motivo | No | Pendiente de implementar el ajuste de -2 unidades y verificar el resultado de 18 unidades. |
-| HU-06 · Intentar ajustar existencias sin indicar el motivo | No | Pendiente de implementar la validación del motivo y comprobar que se conserven 20 unidades. |
-| HU-06 · Evitar duplicar existencias iniciales por doble envío | No | Pendiente de implementar el registro inicial y verificar una sola operación por 20 unidades. |
-| HU-07 · Registrar una compra y aumentar las existencias | No | Pendiente de implementar la compra y verificar 15 unidades y un total de 17500 pesos. |
-| HU-07 · Intentar registrar una compra con cantidad cero | No | Pendiente de implementar la validación y verificar que la compra inválida no se registre. |
-| HU-07 · Retomar una compra después de una llamada | No | Pendiente de implementar el formulario y comprobar que conserve los datos al regresar de la llamada. |
-| HU-08 · Registrar una venta con descuento y actualizar las existencias | No | Pendiente de implementar la venta y verificar el total de 12000 pesos y las 7 unidades restantes. |
-| HU-08 · Intentar vender más unidades de las disponibles | No | Pendiente de implementar la validación de existencias y comprobar el rechazo de la venta. |
-| HU-08 · Revisar el resumen de una venta en una pantalla pequeña | No | Pendiente de implementar el resumen y comprobar su lectura a 360 dp con total de 22500 pesos. |
+| HU-04 | CA01–CA03 | Alta, edición con id y cantidad conservados, errores junto a campos, protección frente a doble envío. |
+| HU-05 | CA01–CA03 | Producto y cantidad correctos, agotado y venta confirmada que reduce 15 a 11 en lista y detalle. |
+| HU-06 | CA01–CA04 | Apertura, ajuste de 20 a 18, motivo/fecha/responsable y rechazo de existencias negativas. |
+| HU-07 | CA01–CA04 | Compra de 5 × 6000 sobre 10 deja 15; líneas válidas, cancelación y reintento idempotente. |
+| HU-08 | CA01–CA05 | Descuento y total, saldo insuficiente, cantidades/precios/descuentos inválidos, competencia por última unidad y cancelación. |
 
-### Pendientes de cierre del parcial
+El refinamiento de HU-07 se comprueba con pausa y reanudación del ciclo de vida Flutter: el borrador de 4 × 3500 conserva sus valores y total 14000 sin alterar existencias. Una llamada real y la recuperación tras finalizar el proceso no se declaran verificadas.
 
-- Confirmar que la aplicación base se instala y funciona en el emulador Android.
-- Implementar la lista, el detalle, el repositorio simulado, el ViewModel y el selector de escenarios.
-- Implementar y comprobar las funciones de las cinco historias conforme al alcance acordado para la entrega; documentar cualquier criterio que permanezca pendiente.
-- Realizar la revisión cruzada de las cinco historias y registrar los nombres de quienes revisaron.
-- Ejecutar el analizador, las pruebas automáticas y los escenarios en Android.
-- Incorporar las cuatro capturas al pull request y registrar los enlaces del PR y del issue.
-- Guardar esta versión del documento en `main` y actualizar la tarjeta INV según el trabajo realizado.
+Los casos de SQLite también comprueban aislamiento entre empresas y rollback con un fallo inyectado en la segunda línea de una compra. El informe ampliado y el recorrido manual están en [validacion-sprint1.md](validacion-sprint1.md).
 
-### Propuesta de continuidad para Sprint 2
+### Pendientes de cierre académico
 
-Los siguientes elementos corresponden al backlog del producto y se confirmarán en la planificación del Sprint 2:
+- Revisión cruzada y aprobación de otra persona, con sus nombres y evidencias.
+- Validación con dos usuarios reales y prueba en Android físico.
+- Medición de RC-01 y capturas finales de los cuatro estados para adjuntar al PR.
+- Crear y vincular PR e issue, revisar, fusionar y actualizar GitHub Projects. No se realizaron publicaciones ni cambios en el tablero.
+- Completar autenticación/autorización, gastos, método de costeo, reportes y sincronización en sus historias correspondientes.
 
-- **TEC-02:** sustituir los datos simulados por almacenamiento real y separar la información por empresa. La tecnología de almacenamiento está por definir.
-- **HU-01, HU-02 y HU-03:** implementar el acceso, la cuenta de empresa y la autorización necesarios para utilizar información real.
-- **HU-09:** conservar los precios y costos históricos de cada venta antes de construir reportes de utilidad.
-- **Historias o criterios que queden abiertos al cerrar Sprint 1:** registrarlos con su motivo y volver a planificarlos; no se consideran terminados por haber creado su documentación.
+La implementación y sus pruebas no equivalen a marcar las historias como Hecho según la Definición de Terminado del equipo. Los cambios están locales, preparados para revisión en la rama técnica.

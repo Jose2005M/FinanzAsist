@@ -1,0 +1,115 @@
+# Mejoras sobre las funciones existentes de FinanzAsist 1.0.1
+
+Revisión del 16 de noviembre de 2026. Objetivo: facilitar los recorridos actuales y prevenir errores al registrar productos, compras, ventas y gastos. No amplía el alcance a clientes, proveedores, sincronización u otros módulos pendientes.
+
+**Seguimiento:** esta revisión conserva el diagnóstico de la versión 1.0.1. La siguiente iteración implementa las dos P1 y la navegación compartida descrita en la primera P2. Consulta el comportamiento y las verificaciones en [Mejoras prioritarias](mejoras-prioridad-alta.md). Las propuestas restantes siguen pendientes.
+
+Método: evaluación A de interfaz Android en este contexto, modo Operate. Se revisaron código y capturas QA existentes de compras, reportes y guías. La evaluación B, los detectores de marcado web y las superposiciones de navegador no aplican a esta interfaz nativa. No se ejecutó una nueva sesión manual con datos reales. Las conclusiones son una evaluación técnica; deben validarse con usuarios.
+
+## Identidad y resultado general
+
+El diseño crema y dorado, la marca y los controles compartidos ofrecen una identidad coherente con la referencia del proyecto. Las oportunidades principales están en escribir importes con seguridad y completar tareas con menos desplazamientos y regresos. Las pantallas de reportes y formularios comparten superficies adecuadas, pero no siempre priorizan la información necesaria para decidir.
+
+## Lo que funciona
+
+- Las operaciones tienen un resumen antes de confirmar, control de existencias y mensajes de resultado.
+- La identidad visual se mantiene entre módulos; los estados de carga, validación y reintento están disponibles.
+- Las guías son opcionales, se pueden reabrir y recuerdan la elección por cuenta. La búsqueda de inventario y los períodos rápidos ya reducen pasos.
+
+## Prioridades
+
+### P1. Importes ambiguos que pueden producir registros incorrectos
+
+`ValidacionProducto.leerImporte` convierte punto y coma en separador decimal. `ReglasInventario.importe` comprueba el valor numérico, no el significado que el usuario quiso dar al separador de miles.
+
+Comprobación ejecutada sobre las funciones actuales:
+
+| Entrada | Valor interpretado | Validación |
+| --- | ---: | --- |
+| `6000` | 6000 | Aceptado |
+| `6.000` | 6 | Aceptado |
+| `6,000` | 6 | Aceptado |
+| `6000,50` | 6000,50 | Aceptado |
+
+Una persona que escriba `6.000` queriendo indicar seis mil puede registrar seis pesos. La ayuda actual pide no usar separadores de miles, pero no evita el error.
+
+Mejora: definir una única regla de entrada de dinero, mostrar la equivalencia inmediata en COP y rechazar las entradas ambiguas o pedir aclaración. No adivinar silenciosamente el importe. Aplicar la misma regla a productos, compras, ventas, descuentos y gastos. Comprobar los cuatro casos anteriores y sus equivalentes al guardar.
+
+Evidencia: `lib/models/validacion_producto.dart:13`, `lib/models/reglas_inventario.dart:32` y `build/revision-importes.log`. Trabajo sugerido: Impeccable harden y clarify.
+
+### P1. Proteger entradas y unificar el comportamiento durante el guardado
+
+Los formularios permiten volver o cancelar sin distinguir si hay datos modificados. Gastos y operaciones bloquean la salida mientras guardan; el formulario de producto no incorpora esa protección de navegación.
+
+Mejora: detectar cambios, ofrecer “Seguir editando” o “Descartar cambios” solo cuando corresponda y proteger también el registro y edición del producto durante el guardado. Conservar un borrador si se necesita salir y retomarlo. Los formularios sin cambios deben poder cerrarse directamente.
+
+Evidencia: `lib/screens/formulario_producto_screen.dart:64`, `lib/screens/formulario_gasto_screen.dart:43` y `lib/screens/operacion_screen.dart:56`. Trabajo sugerido: Impeccable harden.
+
+### P2. Cambiar de módulo sin regresar a Inventario
+
+La barra inferior pertenece a Inventario. Compras, Ventas, Gastos y Reportes se abren como rutas separadas; para pasar de una a otra se vuelve a la pantalla inicial.
+
+Mejora: utilizar una estructura de navegación compartida que mantenga visible el módulo activo y permita cambiar entre destinos directamente. Preservar filtros y posición de consulta, y aplicar la protección de formularios antes de abandonar un borrador.
+
+Evidencia: `lib/screens/inventario_screen.dart:124`. Trabajo sugerido: Impeccable layout y adapt.
+
+### P2. Encontrar productos más rápido al comprar o vender
+
+La búsqueda de Inventario no está disponible en los selectores de compras y ventas. Estos muestran una lista desplegable de todos los productos; el nombre seleccionado puede abreviarse.
+
+Mejora: selector con búsqueda por nombre, unidades disponibles y precio/costo visible. Mantener el nombre completo tras seleccionar. Si todavía no existen productos, ofrecer un acceso a Inventario para crear el primero y luego retomar la operación.
+
+Evidencia: `lib/screens/operacion_screen.dart:220`. Trabajo sugerido: Impeccable distill y clarify.
+
+### P2. Mostrar primero el resultado que el usuario quiere conocer
+
+En Reportes aparecen primero filtros y varios indicadores; la utilidad resultante está después de ventas, compras y gastos. La pantalla obliga a desplazarse para responder cuánto ganó o perdió el negocio.
+
+Mejora: resumen inicial del período con ingresos netos, egresos y utilidad, seguido del detalle. Añadir explicaciones breves junto a “Costo de ventas” y “Utilidad”, conservando las reglas actuales de cálculo. No confundir utilidad con dinero disponible en caja.
+
+Evidencia: `lib/screens/reportes_screen.dart:192`. Trabajo sugerido: Impeccable layout y clarify.
+
+## Otras mejoras concretas
+
+| Área | Ajuste propuesto | Beneficio |
+| --- | --- | --- |
+| Errores de formularios | Desplazar y enfocar el primer campo incorrecto, como ya ocurre en Acceso. | Evita buscar el error cuando el botón queda debajo del formulario o del teclado. |
+| Historiales | Buscar por producto/concepto y filtrar por fechas; mostrar el nombre del responsable antes que su identificador técnico. | Localizar y comprender registros antiguos. |
+| Productos y ventas | Aviso no bloqueante cuando el precio sea menor al costo; advertencia sobre nombres repetidos. | Ayuda a detectar una posible equivocación sin impedir descuentos o decisiones válidas. |
+| Gastos | Evaluar seleccionar hoy por defecto, permitiendo cambiarlo antes de guardar. | Reduce la apertura repetida del calendario para pagos del día. |
+| Costos | Explicar al registrar una compra que su costo no actualiza automáticamente el costo del catálogo utilizado para futuras ventas. | Evita interpretar una utilidad con una regla diferente de la implementada. |
+
+## Evaluación heurística orientativa
+
+Escala 0–4. Es una valoración del recorrido, no una medición con usuarios ni un porcentaje de avance del proyecto.
+
+| Heurística | Puntuación | Observación |
+| --- | ---: | --- |
+| Visibilidad del estado | 3 | Hay indicadores y confirmaciones; falta unificar la salida durante guardados. |
+| Lenguaje del mundo real | 2 | El formato de entrada de dinero y los identificadores técnicos requieren interpretación. |
+| Control y libertad | 2 | La ayuda se puede omitir; falta proteger borradores al salir. |
+| Consistencia | 3 | El tema es compartido; algunos comportamientos difieren entre formularios. |
+| Prevención de errores | 2 | Se comprueban existencias y doble envío; persiste la ambigüedad de importes. |
+| Reconocimiento | 3 | Etiquetas y guías ayudan; los términos financieros requieren ayuda puntual. |
+| Eficiencia | 2 | Ya hay búsqueda y períodos rápidos; falta navegación directa y búsqueda en selectores. |
+| Diseño y jerarquía | 3 | Los formularios están agrupados; el resultado principal del reporte aparece tarde. |
+| Recuperación de errores | 3 | Se conservan entradas para reintentar; falta llevar al primer error en todos los formularios. |
+| Ayuda y documentación | 3 | Existen guías por módulo y manual; conviene aclarar los costos en el momento de registrar. |
+| **Total** | **26/40** | Mejorable, con dos prioridades de prevención de errores. |
+
+Carga cognitiva estimada moderada: dos dificultades en ocho criterios revisados, jerarquía del resultado y necesidad de recordar cómo escribir importes. Los grupos de campos, el resumen previo y la ayuda progresiva son adecuados. Los cinco destinos de navegación son conocidos y no justifican por sí solos reducir módulos.
+
+En el recorrido emocional, la confirmación de operaciones aporta seguridad; los puntos de fricción están en descubrir tarde un error de importe, perder entradas al volver o recorrer una lista larga.
+
+## Recorridos hipotéticos para validar
+
+- Persona principiante: puede escribir seis mil como `6.000` y aceptar el registro sin detectar la diferencia.
+- Persona con ventas frecuentes: repite la búsqueda manual del producto y el regreso a Inventario para cambiar de módulo.
+- Persona que atiende interrupciones: puede abandonar el formulario y perder lo escrito antes de confirmar.
+
+Son escenarios razonados, no observaciones de personas entrevistadas. Validar importes, salida con cambios y selección en un catálogo largo antes de ampliar el alcance.
+
+## Decisiones para la siguiente iteración
+
+1. Elegir entre prevenir errores de dinero/pérdida de entradas o agilizar navegación/selección como primera prioridad.
+2. Elegir entre las tres primeras mejoras o el conjunto de propuestas como alcance de la siguiente iteración.

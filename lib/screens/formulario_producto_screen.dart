@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/superficies_finanzasist.dart';
+import '../widgets/contexto_negocio.dart';
+import '../widgets/protector_formulario.dart';
+import '../widgets/vista_previa_importe.dart';
+
 import '../data/producto_repository.dart';
 import '../models/producto.dart';
 import '../viewmodels/inventario_view_model.dart';
@@ -21,6 +26,8 @@ class FormularioProductoScreen extends StatefulWidget {
 
 class _FormularioProductoScreenState extends State<FormularioProductoScreen> {
   final _formulario = GlobalKey<FormState>();
+  final _salida = GlobalKey<ProtectorFormularioState>();
+  late final List<String> _original;
   late final TextEditingController _nombre;
   late final TextEditingController _costo;
   late final TextEditingController _precio;
@@ -49,7 +56,13 @@ class _FormularioProductoScreenState extends State<FormularioProductoScreen> {
           ? ''
           : _importeParaFormulario(producto.precioVenta),
     );
+    _original = [_nombre.text, _costo.text, _precio.text];
   }
+
+  bool _tieneCambios() =>
+      _nombre.text != _original[0] ||
+      _costo.text != _original[1] ||
+      _precio.text != _original[2];
 
   @override
   void dispose() {
@@ -81,7 +94,8 @@ class _FormularioProductoScreenState extends State<FormularioProductoScreen> {
         );
       }
       if (!mounted) return;
-      Navigator.of(context).pop(true);
+      ContextoNegocio.avisarCambio(context);
+      await _salida.currentState!.finalizar(true);
     } on ProductoNoEncontradoException {
       _mostrarError(
         'El producto ya no está disponible. Regresa al inventario.',
@@ -99,112 +113,128 @@ class _FormularioProductoScreenState extends State<FormularioProductoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_editando ? 'Editar producto' : 'Registrar producto'),
-      ),
-      body: SafeArea(
-        child: ListenableBuilder(
-          listenable: widget.viewModel,
-          builder: (context, _) => SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 520),
-                child: Form(
-                  key: _formulario,
-                  autovalidateMode: AutovalidateMode.onUserInteraction,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (_editando) ...[
-                        Text('Identificador: ${widget.productoInicial!.id}'),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Existencias: ${widget.productoInicial!.cantidad} unidades. '
-                          'Se conservan al editar el producto.',
-                        ),
-                      ] else
-                        const Text(
-                          'El producto se crea con 0 unidades. Las existencias '
-                          'iniciales se registrarán en el módulo de inventario.',
-                        ),
-                      const SizedBox(height: 24),
-                      TextFormField(
-                        key: const ValueKey('nombre-producto'),
-                        controller: _nombre,
-                        enabled: !widget.viewModel.guardando,
-                        textCapitalization: TextCapitalization.sentences,
-                        textInputAction: TextInputAction.next,
-                        decoration: const InputDecoration(
-                          labelText: 'Nombre del producto',
-                          errorMaxLines: 3,
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: widget.viewModel.validarNombre,
-                      ),
-                      const SizedBox(height: 20),
-                      TextFormField(
-                        key: const ValueKey('costo-producto'),
-                        controller: _costo,
-                        enabled: !widget.viewModel.guardando,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                          signed: true,
-                        ),
-                        textInputAction: TextInputAction.next,
-                        decoration: const InputDecoration(
-                          labelText: 'Costo de compra (COP)',
-                          hintText: 'Ej. 6000',
-                          helperText:
-                              'Escribe el valor sin separadores de miles.',
-                          helperMaxLines: 2,
-                          errorMaxLines: 3,
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: widget.viewModel.validarCosto,
-                      ),
-                      const SizedBox(height: 20),
-                      TextFormField(
-                        key: const ValueKey('precio-producto'),
-                        controller: _precio,
-                        enabled: !widget.viewModel.guardando,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                          signed: true,
-                        ),
-                        textInputAction: TextInputAction.done,
-                        onFieldSubmitted: (_) => _guardar(),
-                        decoration: const InputDecoration(
-                          labelText: 'Precio de venta (COP)',
-                          hintText: 'Ej. 10000',
-                          errorMaxLines: 3,
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: widget.viewModel.validarPrecio,
-                      ),
-                      const SizedBox(height: 24),
-                      FilledButton(
-                        key: const ValueKey('guardar-producto'),
-                        onPressed: widget.viewModel.guardando ? null : _guardar,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: widget.viewModel.guardando
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
+    return ListenableBuilder(
+      listenable: widget.viewModel,
+      builder: (context, _) => ProtectorFormulario(
+        key: _salida,
+        tieneCambios: _tieneCambios,
+        estaGuardando: () => widget.viewModel.guardando,
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text(_editando ? 'Editar producto' : 'Registrar producto'),
+            automaticallyImplyLeading: !widget.viewModel.guardando,
+          ),
+          body: SafeArea(
+            child: ListenableBuilder(
+              listenable: widget.viewModel,
+              builder: (context, _) => SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 520),
+                    child: PanelFinanzas(
+                      child: Form(
+                        onChanged: () => setState(() {}),
+                        key: _formulario,
+                        autovalidateMode: AutovalidateMode.onUserInteraction,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (_editando) ...[
+                              Text(
+                                'Identificador: ${widget.productoInicial!.id}',
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Existencias: ${widget.productoInicial!.cantidad} unidades. '
+                                'Se conservan al editar el producto.',
+                              ),
+                            ] else
+                              const Text(
+                                'El producto se crea con 0 unidades. Las existencias '
+                                'iniciales se registran desde el detalle del producto.',
+                              ),
+                            const SizedBox(height: 24),
+                            TextFormField(
+                              key: const ValueKey('nombre-producto'),
+                              controller: _nombre,
+                              enabled: !widget.viewModel.guardando,
+                              textCapitalization: TextCapitalization.sentences,
+                              textInputAction: TextInputAction.next,
+                              decoration: const InputDecoration(
+                                labelText: 'Nombre del producto',
+                                prefixIcon: Icon(Icons.inventory_2_outlined),
+                                errorMaxLines: 4,
+                              ),
+                              validator: widget.viewModel.validarNombre,
+                            ),
+                            const SizedBox(height: 20),
+                            TextFormField(
+                              key: const ValueKey('costo-producto'),
+                              controller: _costo,
+                              enabled: !widget.viewModel.guardando,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                    signed: true,
                                   ),
-                                )
-                              : Text(
-                                  _editando
-                                      ? 'Guardar cambios'
-                                      : 'Guardar producto',
-                                ),
+                              textInputAction: TextInputAction.next,
+                              decoration: const InputDecoration(
+                                labelText: 'Costo de compra (COP)',
+                                prefixIcon: Icon(Icons.shopping_bag_outlined),
+                                hintText: 'Ej. 6000',
+                                helperText: 'Sin miles. Ej.: 6000,50',
+                                helperMaxLines: 2,
+                                errorMaxLines: 4,
+                              ),
+                              validator: widget.viewModel.validarCosto,
+                            ),
+                            VistaPreviaImporte(texto: _costo.text),
+                            const SizedBox(height: 20),
+                            TextFormField(
+                              key: const ValueKey('precio-producto'),
+                              controller: _precio,
+                              enabled: !widget.viewModel.guardando,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                    signed: true,
+                                  ),
+                              textInputAction: TextInputAction.done,
+                              onFieldSubmitted: (_) => _guardar(),
+                              decoration: const InputDecoration(
+                                labelText: 'Precio de venta (COP)',
+                                prefixIcon: Icon(Icons.sell_outlined),
+                                hintText: 'Ej. 10000',
+                                errorMaxLines: 4,
+                              ),
+                              validator: widget.viewModel.validarPrecio,
+                            ),
+                            VistaPreviaImporte(texto: _precio.text),
+                            const SizedBox(height: 24),
+                            FilledButton(
+                              key: const ValueKey('guardar-producto'),
+                              onPressed: widget.viewModel.guardando
+                                  ? null
+                                  : _guardar,
+                              child: widget.viewModel.guardando
+                                  ? const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : Text(
+                                      _editando
+                                          ? 'Guardar cambios'
+                                          : 'Guardar producto',
+                                    ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
