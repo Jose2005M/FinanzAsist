@@ -24,7 +24,7 @@ La aplicación permite registrar una empresa y su propietario, gestionar product
 | Gastos | HU-10 | Registro y consulta de gastos operativos. |
 | Reportes | HU-14 | Resultados numéricos por período con ingresos, egresos y utilidades. |
 
-Estas diez historias cuentan con implementación local. HU-03 está atendida parcialmente mediante separación por empresa y comprobación de sesión. La revisión humana, la validación con usuarios y el estado de las tarjetas de GitHub son pasos distintos de la existencia del código.
+Estas historias y HU-03 cuentan con implementación local, incluyendo usuarios por empresa y permisos comprobados en cada operación. La revisión humana, la validación con usuarios y el estado de las tarjetas de GitHub son pasos distintos de la existencia del código.
 
 ## Cuentas productos e inventario
 
@@ -32,7 +32,7 @@ Estas diez historias cuentan con implementación local. HU-03 está atendida par
 
 El acceso normal de Android comienza en Inicia sesión. Crear cuenta de empresa registra una empresa y una cuenta propietaria en una sola operación, y después abre su inventario.
 
-- Se solicitan nombre de empresa, nombre del propietario, correo electrónico, contraseña y confirmación. La contraseña admite de 15 a 128 caracteres.
+- Se solicitan nombre de empresa, nombre del propietario, correo electrónico, contraseña y confirmación. La contraseña admite de 8 a 128 caracteres.
 
 - El correo es único en este dispositivo; se ignoran las mayúsculas y los espacios exteriores. Los campos incompletos y los correos duplicados muestran una indicación y conservan los demás datos.
 
@@ -40,7 +40,7 @@ El acceso normal de Android comienza en Inicia sesión. Crear cuenta de empresa 
 
 - Al salir se retiran las pantallas privadas y se invalida la sesión anterior. Reiniciar la aplicación exige iniciar sesión de nuevo; las cuentas permanecen guardadas.
 
-La primera cuenta vincula los datos anteriores de negocio-local, si existen. Sus responsables históricos se conservan. Las demás cuentas crean empresas vacías. Esta entrega permite un propietario por empresa; no incluye empleados, invitaciones ni recuperación de contraseña.
+La primera cuenta vincula los datos anteriores de negocio-local, si existen. Sus responsables históricos se conservan. Las demás cuentas crean empresas vacías. Esta entrega permite un propietario por empresa y empleados con roles Encargado de inventario, Vendedor y Consulta. El propietario puede crearlos, activar o desactivar sus cuentas, cambiar su rol y restablecer sus contraseñas. No hay invitaciones ni recuperación por correo.
 
 ### Registro y edición de productos
 
@@ -128,11 +128,11 @@ Las compras no se descuentan otra vez de la utilidad, porque el costo de los pro
 
 ### Conservación y separación de información
 
-Android conserva cuentas, productos, operaciones, movimientos y gastos en SQLite. Los registros sobreviven al cierre de sesión y al reinicio de la aplicación. La base migra a la versión 3 sin borrar los datos anteriores.
+Android conserva cuentas, productos, operaciones, movimientos y gastos en SQLite. Los registros sobreviven al cierre de sesión y al reinicio de la aplicación. La base migra a la versión 6 sin borrar los datos anteriores.
 
 Las consultas y escrituras del repositorio comprueban la sesión y la cuenta activa y filtran por empresa. Las contraseñas no se guardan en texto plano: se conserva una derivación PBKDF2 con sal aleatoria. La base local no está cifrada; utiliza el almacenamiento privado de Android.
 
-Cerrar sesión impide reutilizar el repositorio anterior para leer o escribir. La separación por empresa está implementada, pero la administración de roles y permisos específicos sigue pendiente.
+Cerrar sesión impide reutilizar el repositorio anterior para leer o escribir. La sesión comprueba cuenta activa, empresa, usuario y rol vigente. Cada operación exige su permiso; desactivar un empleado o cambiar su rol invalida la sesión abierta en su siguiente operación.
 
 ### Validación de datos y uso de la interfaz
 
@@ -158,7 +158,7 @@ Esta versión cuenta con implementación local de HU-01, HU-02, HU-04, HU-05, HU
 
 | Historia | Estado | Funcionalidad por completar |
 | --- | --- | --- |
-| HU-03 | Parcial | Existen los roles propietario y administrador: un administrador por dispositivo, creado con autorización de un propietario, que lista las cuentas, las activa o desactiva y restablece contraseñas. Faltan usuarios adicionales por empresa y permisos configurables. |
+| HU-03 | Implementada localmente | Usuarios por empresa con propietario, encargado de inventario, vendedor y consulta. El propietario gestiona empleados, gastos y respaldos; el encargado registra productos, existencias y compras; el vendedor registra y consulta solo sus ventas, sin costos; consulta solo lee. Permisos verificados en SQLite y reflejados en la interfaz. |
 | HU-11 | Pendiente | Crear categorías y subcategorías y filtrar por ellas. |
 | HU-12 | Pendiente | Clientes, asociación con ventas e historial por cliente. |
 | HU-13 | Pendiente | Proveedores, asociación con compras y consultas por proveedor. |
@@ -171,7 +171,7 @@ Esta versión cuenta con implementación local de HU-01, HU-02, HU-04, HU-05, HU
 
 ### Otros límites de esta entrega
 
-No hay verificación por correo, recuperación o cambio de contraseña ni edición de cuentas y empresas. Sí existe la exportación y restauración manual de la base completa desde el menú de la cuenta, disponible cuando el dispositivo tiene una sola cuenta. Tampoco hay anulación o edición de compras y ventas confirmadas, devoluciones ni edición o eliminación de gastos. Eliminar los datos de Android o desinstalar la aplicación puede eliminar los registros locales.
+No hay verificación ni recuperación por correo, cambio de contraseña del propietario ni edición de cuentas y empresas. El propietario sí puede restablecer contraseñas de empleados. Sí existe la exportación y restauración manual de la base completa desde el menú de la cuenta, disponible solo para el propietario cuando el dispositivo tiene un único propietario, aunque tenga empleados. Tampoco hay anulación o edición de compras y ventas confirmadas, devoluciones ni edición o eliminación de gastos. Eliminar los datos de Android o desinstalar la aplicación puede eliminar los registros locales.
 
 ### Documentación de referencia
 

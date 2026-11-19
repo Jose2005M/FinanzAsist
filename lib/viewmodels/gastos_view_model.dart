@@ -9,6 +9,7 @@ class GastosViewModel extends ChangeNotifier {
   GastosViewModel(this.repositorio);
   final NegocioRepository repositorio;
   List<Gasto> gastos = const [];
+  Map<String, String> responsables = const {};
   bool cargando = true;
   String? error;
   bool _cerrado = false;
@@ -22,8 +23,10 @@ class GastosViewModel extends ChangeNotifier {
     notifyListeners();
     try {
       final resultado = await repositorio.obtenerGastos();
+      final nombres = await repositorio.obtenerResponsables();
       if (_cerrado || solicitud != _solicitud) return;
       gastos = List.unmodifiable(resultado);
+      responsables = nombres;
     } catch (_) {
       if (_cerrado || solicitud != _solicitud) return;
       error = 'No pudimos cargar los gastos. Reintenta la consulta.';

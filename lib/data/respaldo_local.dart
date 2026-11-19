@@ -161,7 +161,9 @@ class RespaldoLocal {
       throw const RespaldoException('Inicia sesión para usar los respaldos.');
     }
     try {
-      await sesion.verificar(db);
+      await db.transaction(
+        (tx) => sesion.verificar(tx, permiso: Permiso.gestionarRespaldos),
+      );
     } on AccesoException catch (error) {
       throw RespaldoException(error.mensaje);
     }

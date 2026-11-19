@@ -1,47 +1,38 @@
 import 'package:flutter/material.dart';
 
 import '../data/autenticacion_local.dart';
+import '../data/usuarios_empresa.dart';
 import '../theme/tema_finanzasist.dart';
 import '../widgets/superficies_finanzasist.dart';
 
-/// Crea la única cuenta de administrador con la autorización de un
-/// propietario. Al terminar, la sesión del administrador queda iniciada.
-class CrearAdministradorScreen extends StatefulWidget {
-  const CrearAdministradorScreen({super.key, required this.autenticacion});
-  final AutenticacionLocal autenticacion;
+/// Formulario del propietario para crear la cuenta de un empleado.
+class NuevoUsuarioScreen extends StatefulWidget {
+  const NuevoUsuarioScreen({super.key, required this.usuarios});
+  final GestionUsuariosEmpresa usuarios;
 
   @override
-  State<CrearAdministradorScreen> createState() =>
-      _CrearAdministradorScreenState();
+  State<NuevoUsuarioScreen> createState() => _NuevoUsuarioScreenState();
 }
 
-class _CrearAdministradorScreenState extends State<CrearAdministradorScreen> {
+class _NuevoUsuarioScreenState extends State<NuevoUsuarioScreen> {
   final _formulario = GlobalKey<FormState>();
-  final _correoPropietario = TextEditingController();
-  final _clavePropietario = TextEditingController();
   final _nombre = TextEditingController();
   final _correo = TextEditingController();
   final _clave = TextEditingController();
   final _confirmacion = TextEditingController();
+  RolCuenta _rol = RolCuenta.vendedor;
   bool _ocupado = false;
   String? _error;
 
   @override
   void dispose() {
-    for (final campo in [
-      _correoPropietario,
-      _clavePropietario,
-      _nombre,
-      _correo,
-      _clave,
-      _confirmacion,
-    ]) {
+    for (final campo in [_nombre, _correo, _clave, _confirmacion]) {
       campo.dispose();
     }
     super.dispose();
   }
 
-  Future<void> _crear() async {
+  Future<void> _guardar() async {
     if (_ocupado || !(_formulario.currentState?.validate() ?? false)) return;
     FocusScope.of(context).unfocus();
     setState(() {
@@ -49,14 +40,13 @@ class _CrearAdministradorScreenState extends State<CrearAdministradorScreen> {
       _error = null;
     });
     try {
-      await widget.autenticacion.crearAdministrador(
-        DatosAdministrador(
+      await widget.usuarios.crearUsuario(
+        DatosUsuario(
           nombre: _nombre.text,
           correo: _correo.text,
           clave: _clave.text,
+          rol: _rol,
         ),
-        correoPropietario: _correoPropietario.text,
-        clavePropietario: _clavePropietario.text,
       );
       if (mounted) Navigator.pop(context, true);
     } on AccesoException catch (e) {
@@ -89,14 +79,9 @@ class _CrearAdministradorScreenState extends State<CrearAdministradorScreen> {
     ),
   );
 
-  Widget _titulo(String texto) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: Text(texto, style: Theme.of(context).textTheme.titleMedium),
-  );
-
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Crear administrador')),
+    appBar: AppBar(title: const Text('Crear usuario')),
     body: AnchoContenido(
       child: SafeArea(
         child: Form(
@@ -107,64 +92,56 @@ class _CrearAdministradorScreenState extends State<CrearAdministradorScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const CabeceraModulo(
-                  titulo: 'Cuenta de administrador',
-                  descripcion:
-                      'Verá los usuarios de este dispositivo y podrá '
-                      'desactivarlos o restablecer su contraseña. Solo puede '
-                      'existir uno y necesita la autorización de un propietario.',
-                  icono: Icons.admin_panel_settings_outlined,
-                ),
-                const SizedBox(height: 24),
                 PanelFinanzas(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _titulo('Autorización del propietario'),
-                      _campo(
-                        clave: 'correo-propietario',
-                        etiqueta: 'Correo del propietario',
-                        controlador: _correoPropietario,
-                        teclado: TextInputType.emailAddress,
-                        validar: DatosRegistro.validarCorreo,
+                      DropdownButtonFormField<RolCuenta>(
+                        key: const ValueKey('rol-usuario'),
+                        initialValue: _rol,
+                        // Ocupa el ancho disponible en pantallas de 360 dp.
+                        isExpanded: true,
+                        decoration: const InputDecoration(labelText: 'Rol'),
+                        items: [
+                          for (final rol in RolCuenta.empleados)
+                            DropdownMenuItem(
+                              value: rol,
+                              child: Text(
+                                rol.etiqueta,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                        ],
+                        onChanged: _ocupado
+                            ? null
+                            : (rol) => setState(() => _rol = rol ?? _rol),
                       ),
-                      _campo(
-                        clave: 'clave-propietario',
-                        etiqueta: 'Contraseña del propietario',
-                        controlador: _clavePropietario,
-                        secreto: true,
-                        validar: (valor) => (valor ?? '').isEmpty
-                            ? 'Escribe la contraseña del propietario.'
-                            : null,
+                      const SizedBox(height: 8),
+                      Text(
+                        _rol.descripcion,
+                        style: Theme.of(context).textTheme.bodyMedium
+                            ?.copyWith(color: ColoresFinanzAsist.secundaria),
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                PanelFinanzas(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _titulo('Datos del administrador'),
+                      const SizedBox(height: 20),
                       _campo(
-                        clave: 'nombre-admin',
+                        clave: 'nombre-usuario',
                         etiqueta: 'Nombre',
                         controlador: _nombre,
                         validar: (valor) => DatosRegistro.validarNombre(
                           valor,
-                          'el nombre del administrador',
+                          'el nombre del usuario',
                           100,
                         ),
                       ),
                       _campo(
-                        clave: 'correo-admin',
-                        etiqueta: 'Correo del administrador',
+                        clave: 'correo-usuario',
+                        etiqueta: 'Correo',
                         controlador: _correo,
                         teclado: TextInputType.emailAddress,
                         validar: DatosRegistro.validarCorreo,
                       ),
                       _campo(
-                        clave: 'clave-admin',
+                        clave: 'clave-usuario',
                         etiqueta: 'Contraseña',
                         controlador: _clave,
                         secreto: true,
@@ -174,7 +151,7 @@ class _CrearAdministradorScreenState extends State<CrearAdministradorScreen> {
                         validar: DatosRegistro.validarClave,
                       ),
                       _campo(
-                        clave: 'confirmar-clave-admin',
+                        clave: 'confirmar-clave-usuario',
                         etiqueta: 'Confirmar contraseña',
                         controlador: _confirmacion,
                         secreto: true,
@@ -189,20 +166,20 @@ class _CrearAdministradorScreenState extends State<CrearAdministradorScreen> {
                   const SizedBox(height: 16),
                   Text(
                     error,
-                    key: const ValueKey('error-crear-admin'),
+                    key: const ValueKey('error-nuevo-usuario'),
                     style: const TextStyle(color: ColoresFinanzAsist.error),
                   ),
                 ],
                 const SizedBox(height: 24),
                 FilledButton(
-                  key: const ValueKey('crear-admin'),
-                  onPressed: _ocupado ? null : _crear,
+                  key: const ValueKey('guardar-usuario'),
+                  onPressed: _ocupado ? null : _guardar,
                   child: _ocupado
                       ? const SizedBox.square(
                           dimension: 22,
                           child: CircularProgressIndicator(strokeWidth: 2.5),
                         )
-                      : const Text('Crear administrador'),
+                      : const Text('Crear usuario'),
                 ),
               ],
             ),

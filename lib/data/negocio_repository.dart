@@ -6,6 +6,7 @@ import 'producto_repository.dart';
 abstract interface class NegocioRepository implements ProductoRepository {
   String get empresaId;
   String get usuarioId;
+  Future<Map<String, String>> obtenerResponsables();
   Future<Operacion> confirmarOperacion(SolicitudOperacion solicitud);
   Future<List<Operacion>> obtenerOperaciones({TipoOperacion? tipo});
   Future<List<MovimientoInventario>> obtenerMovimientos({String? productoId});

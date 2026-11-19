@@ -1,18 +1,18 @@
 import 'package:flutter/foundation.dart';
 
-import '../data/administracion_local.dart';
 import '../data/autenticacion_local.dart';
+import '../data/usuarios_empresa.dart';
 
-class AdministracionViewModel extends ChangeNotifier {
-  AdministracionViewModel(this.administracion);
-  final GestionCuentas administracion;
+class UsuariosEmpresaViewModel extends ChangeNotifier {
+  UsuariosEmpresaViewModel(this.usuarios);
+  final GestionUsuariosEmpresa usuarios;
 
-  List<CuentaResumen> cuentas = const [];
+  List<UsuarioEmpresa> lista = const [];
   bool cargando = true;
   String? error;
 
-  /// Cuenta que se está modificando; sus acciones quedan deshabilitadas.
-  String? procesando;
+  /// Hay una modificación en curso; las acciones quedan deshabilitadas.
+  bool procesando = false;
   bool _cerrado = false;
   int _solicitud = 0;
 
@@ -26,9 +26,9 @@ class AdministracionViewModel extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
-      final resultado = await administracion.listarCuentas();
+      final resultado = await usuarios.listarUsuarios();
       if (_cerrado || solicitud != _solicitud) return;
-      cuentas = resultado;
+      lista = List.unmodifiable(resultado);
     } on AccesoException catch (e) {
       if (_cerrado || solicitud != _solicitud) return;
       error = e.mensaje;
@@ -40,25 +40,19 @@ class AdministracionViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Devuelve el mensaje de error, o `null` si la acción se completó.
-  Future<String?> cambiarEstado(CuentaResumen cuenta, {required bool activa}) =>
-      _modificar(
-        cuenta,
-        () => administracion.cambiarEstado(cuenta.id, activa: activa),
-      );
+  /// Cada acción devuelve el mensaje de error, o `null` si se completó.
+  Future<String?> cambiarEstado(UsuarioEmpresa u, {required bool activa}) =>
+      _modificar(() => usuarios.cambiarEstado(u.id, activa: activa));
 
-  Future<String?> restablecerClave(CuentaResumen cuenta, String clave) =>
-      _modificar(
-        cuenta,
-        () => administracion.restablecerClave(cuenta.id, clave),
-      );
+  Future<String?> cambiarRol(UsuarioEmpresa u, RolCuenta rol) =>
+      _modificar(() => usuarios.cambiarRol(u.id, rol));
 
-  Future<String?> _modificar(
-    CuentaResumen cuenta,
-    Future<void> Function() accion,
-  ) async {
-    if (procesando != null || _cerrado) return null;
-    procesando = cuenta.id;
+  Future<String?> restablecerClave(UsuarioEmpresa u, String clave) =>
+      _modificar(() => usuarios.restablecerClave(u.id, clave));
+
+  Future<String?> _modificar(Future<void> Function() accion) async {
+    if (procesando || _cerrado) return null;
+    procesando = true;
     notifyListeners();
     String? resultado;
     try {
@@ -69,7 +63,7 @@ class AdministracionViewModel extends ChangeNotifier {
       resultado = _errorGenerico;
     }
     if (_cerrado) return resultado;
-    procesando = null;
+    procesando = false;
     await cargar();
     return resultado;
   }

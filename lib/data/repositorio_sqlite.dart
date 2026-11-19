@@ -44,9 +44,12 @@ class RepositorioSqlite implements NegocioRepository {
   @override
   final String usuarioId;
 
-  Future<T> _conSesion<T>(Future<T> Function(DatabaseExecutor) accion) async {
+  Future<T> _conSesion<T>(
+    Future<T> Function(DatabaseExecutor) accion, {
+    Permiso? permiso,
+  }) async {
     return (await base.abrir).transaction((tx) async {
-      await _asegurarSesion(tx);
+      await _asegurarSesion(tx, permiso: permiso);
       return accion(tx);
     });
   }
@@ -64,12 +67,12 @@ class RepositorioSqlite implements NegocioRepository {
 
   @override
   Future<Gasto> registrarGasto(SolicitudGasto solicitud) async {
-    final gasto = solicitud.confirmar(
-      empresaId: empresaId,
-      usuarioId: usuarioId,
-      registradoEn: _reloj(),
-    );
     return _conSesion((tx) async {
+      final gasto = solicitud.confirmar(
+        empresaId: empresaId,
+        usuarioId: usuarioId,
+        registradoEn: _reloj(),
+      );
       final previos = await tx.query(
         'gastos',
         where: 'empresa = ? AND id = ?',
@@ -95,7 +98,7 @@ class RepositorioSqlite implements NegocioRepository {
         'registrado': gasto.registradoEn.toIso8601String(),
       });
       return gasto;
-    });
+    }, permiso: Permiso.registrarGastos);
   }
 
   Future<List<Gasto>> _gastos(
@@ -118,7 +121,10 @@ class RepositorioSqlite implements NegocioRepository {
 
   @override
   Future<List<Gasto>> obtenerGastos({PeriodoReporte? periodo}) async =>
-      _conSesion((db) => _gastos(db, periodo: periodo));
+      _conSesion(
+        (db) => _gastos(db, periodo: periodo),
+        permiso: Permiso.verGastos,
+      );
 
   @override
   Future<ReporteFinanciero> obtenerReporte(
@@ -145,12 +151,14 @@ class RepositorioSqlite implements NegocioRepository {
       ),
       gastos: await _gastos(tx, periodo: periodo),
     );
-  });
+  }, permiso: Permiso.verReportes);
 
-  Future<void> _asegurarSesion(DatabaseExecutor db) async {
+  bool _puede(Permiso permiso) => _sesion?.puede(permiso) ?? true;
+
+  Future<void> _asegurarSesion(DatabaseExecutor db, {Permiso? permiso}) async {
     final sesion = _sesion;
     if (sesion != null) {
-      await sesion.verificar(db);
+      await sesion.verificar(db, permiso: permiso);
       return;
     }
     if ((await db.query('cuentas', columns: ['id'], limit: 1)).isNotEmpty) {
@@ -185,8 +193,41 @@ class RepositorioSqlite implements NegocioRepository {
         orderBy: 'rowid',
       )).map(_producto).toList();
 
+  Producto _productoVisible(Producto producto) => _puede(Permiso.verCostos)
+      ? producto
+      : Producto(
+          id: producto.id,
+          empresaId: producto.empresaId,
+          nombre: producto.nombre,
+          cantidad: producto.cantidad,
+          costoCompra: 0,
+          precioVenta: producto.precioVenta,
+        );
+
+  Operacion _operacionVisible(Operacion operacion) => _puede(Permiso.verCostos)
+      ? operacion
+      : Operacion(
+          solicitud: operacion.solicitud,
+          empresaId: operacion.empresaId,
+          usuarioId: operacion.usuarioId,
+          fecha: operacion.fecha,
+          subtotalCentavos: operacion.subtotalCentavos,
+          descuentoCentavos: operacion.descuentoCentavos,
+          metodoCosto: operacion.metodoCosto,
+          detalles: [
+            for (final detalle in operacion.detalles)
+              {
+                ...detalle,
+                'costoCatalogoCentavos': 0,
+                'costoAsignadoCentavos': 0,
+              },
+          ],
+        );
+
   @override
-  Future<List<Producto>> obtenerTodos() async => _conSesion(_productos);
+  Future<List<Producto>> obtenerTodos() async => _conSesion(
+    (db) async => (await _productos(db)).map(_productoVisible).toList(),
+  );
 
   @override
   Future<Producto?> obtenerPorId(String id) async {
@@ -196,7 +237,7 @@ class RepositorioSqlite implements NegocioRepository {
         where: 'empresa = ? AND id = ?',
         whereArgs: [empresaId, id],
       );
-      return rows.isEmpty ? null : _producto(rows.single);
+      return rows.isEmpty ? null : _productoVisible(_producto(rows.single));
     });
   }
 
@@ -206,20 +247,20 @@ class RepositorioSqlite implements NegocioRepository {
     required double costoCompra,
     required double precioVenta,
   }) async {
-    ValidacionProducto.verificar(
-      nombreProducto: nombre,
-      costoCompra: costoCompra,
-      precioVenta: precioVenta,
-    );
-    final producto = Producto(
-      id: nuevoId(),
-      empresaId: empresaId,
-      nombre: nombre.trim(),
-      cantidad: 0,
-      costoCompra: pesos(centavos(costoCompra)),
-      precioVenta: pesos(centavos(precioVenta)),
-    );
-    await _conSesion((tx) async {
+    return _conSesion((tx) async {
+      ValidacionProducto.verificar(
+        nombreProducto: nombre,
+        costoCompra: costoCompra,
+        precioVenta: precioVenta,
+      );
+      final producto = Producto(
+        id: nuevoId(),
+        empresaId: empresaId,
+        nombre: nombre.trim(),
+        cantidad: 0,
+        costoCompra: pesos(centavos(costoCompra)),
+        precioVenta: pesos(centavos(precioVenta)),
+      );
       await tx.insert('productos', {
         'empresa': empresaId,
         'id': producto.id,
@@ -228,8 +269,8 @@ class RepositorioSqlite implements NegocioRepository {
         'costo': centavos(costoCompra),
         'precio': centavos(precioVenta),
       });
-    });
-    return producto;
+      return producto;
+    }, permiso: Permiso.gestionarProductos);
   }
 
   @override
@@ -239,12 +280,12 @@ class RepositorioSqlite implements NegocioRepository {
     required double costoCompra,
     required double precioVenta,
   }) async {
-    ValidacionProducto.verificar(
-      nombreProducto: nombre,
-      costoCompra: costoCompra,
-      precioVenta: precioVenta,
-    );
     return _conSesion((tx) async {
+      ValidacionProducto.verificar(
+        nombreProducto: nombre,
+        costoCompra: costoCompra,
+        precioVenta: precioVenta,
+      );
       final count = await tx.update(
         'productos',
         {
@@ -263,83 +304,116 @@ class RepositorioSqlite implements NegocioRepository {
           whereArgs: [empresaId, id],
         )).single,
       );
-    });
+    }, permiso: Permiso.gestionarProductos);
   }
 
   @override
   Future<Operacion> confirmarOperacion(SolicitudOperacion solicitud) async {
-    return _conSesion((tx) async {
-      final previas = await tx.query(
-        'operaciones',
-        where: 'empresa = ? AND id = ?',
-        whereArgs: [empresaId, solicitud.id],
-      );
-      if (previas.isNotEmpty) {
-        final previa = Operacion.fromJson(
-          jsonDecode(previas.single['datos'] as String) as Map<String, dynamic>,
-        );
-        if (jsonEncode(previa.solicitud.toJson()) !=
-            jsonEncode(solicitud.toJson())) {
-          throw const ReglaNegocioException(
-            'El identificador ya corresponde a otra operación',
-          );
-        }
-        return previa;
-      }
-      // Lectura, validación del saldo actual y escritura bajo la misma transacción.
-      final resultado = ReglasInventario.aplicar(
-        solicitud: solicitud,
-        productos: await _productos(tx),
-        movimientos: await _movimientos(tx),
-        empresaId: empresaId,
-        usuarioId: usuarioId,
-        fecha: _reloj().toUtc(),
-      );
-      final operacion = resultado.operacion;
-      await tx.insert('operaciones', {
-        'empresa': empresaId,
-        'id': operacion.id,
-        'usuario': usuarioId,
-        'tipo': operacion.tipo.name,
-        'fecha': operacion.fecha.toIso8601String(),
-        'datos': jsonEncode(operacion.toJson()),
-      });
-      for (final movimiento in resultado.movimientos) {
-        await tx.update(
-          'productos',
-          {'cantidad': movimiento.saldo},
+    return _conSesion(
+      (tx) async {
+        final previas = await tx.query(
+          'operaciones',
           where: 'empresa = ? AND id = ?',
-          whereArgs: [empresaId, movimiento.productoId],
+          whereArgs: [empresaId, solicitud.id],
         );
-        await tx.insert('movimientos', {
+        if (previas.isNotEmpty) {
+          final previa = Operacion.fromJson(
+            jsonDecode(previas.single['datos'] as String)
+                as Map<String, dynamic>,
+          );
+          // Un identificador conocido no permite leer la venta de otra persona.
+          if (previa.tipo == TipoOperacion.venta &&
+              !_puede(Permiso.verTodasLasVentas) &&
+              previa.usuarioId != usuarioId) {
+            throw const AccesoException('Tu rol no permite esta acción.');
+          }
+          if (jsonEncode(previa.solicitud.toJson()) !=
+              jsonEncode(solicitud.toJson())) {
+            throw const ReglaNegocioException(
+              'El identificador ya corresponde a otra operación',
+            );
+          }
+          return _operacionVisible(previa);
+        }
+        // Lectura, validación del saldo actual y escritura bajo la misma transacción.
+        final resultado = ReglasInventario.aplicar(
+          solicitud: solicitud,
+          productos: await _productos(tx),
+          movimientos: await _movimientos(tx),
+          empresaId: empresaId,
+          usuarioId: usuarioId,
+          fecha: _reloj().toUtc(),
+        );
+        final operacion = resultado.operacion;
+        await tx.insert('operaciones', {
           'empresa': empresaId,
-          'operacion': operacion.id,
-          'producto': movimiento.productoId,
+          'id': operacion.id,
           'usuario': usuarioId,
-          'fecha': movimiento.fecha.toIso8601String(),
-          'tipo': movimiento.tipo.name,
-          'cantidad': movimiento.cantidad,
-          'saldo': movimiento.saldo,
-          'motivo': movimiento.motivo,
+          'tipo': operacion.tipo.name,
+          'fecha': operacion.fecha.toIso8601String(),
+          'datos': jsonEncode(operacion.toJson()),
         });
-      }
-      return operacion;
-    });
+        for (final movimiento in resultado.movimientos) {
+          await tx.update(
+            'productos',
+            {'cantidad': movimiento.saldo},
+            where: 'empresa = ? AND id = ?',
+            whereArgs: [empresaId, movimiento.productoId],
+          );
+          await tx.insert('movimientos', {
+            'empresa': empresaId,
+            'operacion': operacion.id,
+            'producto': movimiento.productoId,
+            'usuario': usuarioId,
+            'fecha': movimiento.fecha.toIso8601String(),
+            'tipo': movimiento.tipo.name,
+            'cantidad': movimiento.cantidad,
+            'saldo': movimiento.saldo,
+            'motivo': movimiento.motivo,
+          });
+        }
+        return _operacionVisible(operacion);
+      },
+      permiso: switch (solicitud.tipo) {
+        TipoOperacion.inicial ||
+        TipoOperacion.ajuste => Permiso.gestionarExistencias,
+        TipoOperacion.compra => Permiso.registrarCompras,
+        TipoOperacion.venta => Permiso.registrarVentas,
+      },
+    );
   }
 
   @override
   Future<List<Operacion>> obtenerOperaciones({TipoOperacion? tipo}) async {
     return _conSesion((db) async {
+      if (tipo == null || tipo == TipoOperacion.compra) {
+        await _sesion?.verificar(db, permiso: Permiso.verCompras);
+      }
+      if (tipo == null) {
+        await _sesion?.verificar(db, permiso: Permiso.verTodasLasVentas);
+      }
+      final propias =
+          tipo == TipoOperacion.venta && !_puede(Permiso.verTodasLasVentas);
+      if (propias) {
+        await _sesion?.verificar(db, permiso: Permiso.verVentasPropias);
+      }
       final rows = await db.query(
         'operaciones',
-        where: tipo == null ? 'empresa = ?' : 'empresa = ? AND tipo = ?',
-        whereArgs: [empresaId, if (tipo != null) tipo.name],
+        where:
+            'empresa = ?${tipo == null ? '' : ' AND tipo = ?'}${propias ? ' AND usuario = ?' : ''}',
+        whereArgs: [
+          empresaId,
+          if (tipo != null) tipo.name,
+          if (propias) usuarioId,
+        ],
         orderBy: 'fecha DESC, rowid DESC',
       );
       return rows
           .map(
-            (r) => Operacion.fromJson(
-              jsonDecode(r['datos'] as String) as Map<String, dynamic>,
+            (r) => _operacionVisible(
+              Operacion.fromJson(
+                jsonDecode(r['datos'] as String) as Map<String, dynamic>,
+              ),
             ),
           )
           .toList();
@@ -379,6 +453,20 @@ class RepositorioSqlite implements NegocioRepository {
   Future<List<MovimientoInventario>> obtenerMovimientos({
     String? productoId,
   }) async => _conSesion((db) => _movimientos(db, productoId: productoId));
+
+  @override
+  Future<Map<String, String>> obtenerResponsables() => _conSesion((db) async {
+    final cuentas = await db.query(
+      'cuentas',
+      columns: ['usuario', 'nombre'],
+      where: 'empresa = ?',
+      whereArgs: [empresaId],
+    );
+    return {
+      for (final cuenta in cuentas)
+        cuenta['usuario'] as String: cuenta['nombre'] as String,
+    };
+  });
 
   @override
   EscenarioInventario get escenario => EscenarioInventario.conDatos;

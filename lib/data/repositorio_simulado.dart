@@ -27,6 +27,10 @@ class RepositorioSimulado implements NegocioRepository {
   String get empresaId => 'negocio-local';
   @override
   String get usuarioId => 'usuario-demo';
+  @override
+  Future<Map<String, String>> obtenerResponsables() async => {
+    usuarioId: 'Usuario de demostración',
+  };
   final List<Operacion> _operaciones = [];
   final List<MovimientoInventario> _movimientos = [];
   final List<Gasto> _gastos = [];

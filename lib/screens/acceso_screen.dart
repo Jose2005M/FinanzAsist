@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../data/autenticacion_local.dart';
 import '../widgets/acciones_respaldo.dart';
-import 'crear_administrador_screen.dart';
+
 import '../widgets/marca_finanzasist.dart';
 import '../theme/tema_finanzasist.dart';
 import '../widgets/superficies_finanzasist.dart';
@@ -34,29 +34,6 @@ class _AccesoScreenState extends State<AccesoScreen> {
   String? _error;
   bool _restaurando = false;
   late Future<bool> _restaurable = _consultarRestauracion();
-  late final Future<bool> _administrable = _consultarAdministrador();
-
-  Future<bool> _consultarAdministrador() async {
-    try {
-      return await widget.autenticacion.puedeCrearAdministrador();
-    } on Exception {
-      // Si la base no abre, el acceso ya muestra su propio error.
-      return false;
-    }
-  }
-
-  Future<void> _crearAdministrador() async {
-    if (_ocupado || _restaurando) return;
-    FocusScope.of(context).unfocus();
-    // Al crearse, la sesión del administrador reemplaza esta pantalla.
-    await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) =>
-            CrearAdministradorScreen(autenticacion: widget.autenticacion),
-      ),
-    );
-  }
-
   Future<bool> _consultarRestauracion() async {
     final respaldo = widget.respaldo;
     if (respaldo == null) return false;
@@ -235,7 +212,6 @@ class _AccesoScreenState extends State<AccesoScreen> {
                           const SizedBox(height: 24),
                           _informacionLocal(),
                           _opcionRestaurar(),
-                          _opcionAdministrador(),
                         ],
                       ),
                     ),
@@ -559,26 +535,6 @@ class _AccesoScreenState extends State<AccesoScreen> {
         ),
       ),
     ],
-  );
-
-  Widget _opcionAdministrador() => FutureBuilder<bool>(
-    future: _administrable,
-    builder: (context, consulta) {
-      if (consulta.data != true) return const SizedBox.shrink();
-      return Padding(
-        padding: const EdgeInsets.only(top: 4),
-        child: TextButton.icon(
-          key: const ValueKey('crear-administrador-acceso'),
-          onPressed: _ocupado || _restaurando ? null : _crearAdministrador,
-          icon: const Icon(Icons.admin_panel_settings_outlined),
-          style: TextButton.styleFrom(
-            foregroundColor: ColoresFinanzAsist.secundaria,
-            minimumSize: const Size.fromHeight(48),
-          ),
-          label: const Text('Crear administrador'),
-        ),
-      );
-    },
   );
 
   Widget _opcionRestaurar() => FutureBuilder<bool>(

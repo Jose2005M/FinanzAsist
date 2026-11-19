@@ -11,7 +11,7 @@ class BaseDatosLocal {
     : factory = factory ?? databaseFactory;
 
   /// Versión del esquema que crea y entiende esta compilación.
-  static const version = 5;
+  static const version = 6;
   static const _auxiliares = ['-wal', '-shm', '-journal'];
 
   final DatabaseFactory factory;
@@ -43,6 +43,7 @@ class BaseDatosLocal {
           if (anterior < 3) await _crearCuentas(db);
           if (anterior < 4) await _crearGuias(db);
           if (anterior < 5) await _agregarRol(db);
+          if (anterior < 6) await _usuariosPorEmpresa(db);
         },
         onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
         onCreate: (db, version) async {
@@ -63,8 +64,85 @@ class BaseDatosLocal {
           await _crearCuentas(db);
           await _crearGuias(db);
           await _agregarRol(db);
+          await _usuariosPorEmpresa(db);
         },
       ),
+    );
+  }
+
+  /// Versión 6: empleados de una empresa y un único propietario por empresa.
+  /// onCreate/onUpgrade ya están dentro de una transacción con FK activas.
+  Future<void> _usuariosPorEmpresa(DatabaseExecutor db) async {
+    await db.execute('DROP INDEX IF EXISTS un_administrador');
+    final esquema = await db.rawQuery(
+      "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'cuentas'",
+    );
+    final actualizado = (esquema.single['sql'] as String).contains(
+      "'encargado'",
+    );
+    if (!actualizado) {
+      final administradores = await db.query(
+        'cuentas',
+        columns: ['id', 'empresa', 'usuario'],
+        where: "rol = 'administrador'",
+      );
+      for (final administrador in administradores) {
+        await db.delete(
+          'guias_vistas',
+          where: 'cuenta = ?',
+          whereArgs: [administrador['id']],
+        );
+        await db.delete(
+          'cuentas',
+          where: 'id = ?',
+          whereArgs: [administrador['id']],
+        );
+        await db.delete(
+          'usuarios',
+          where: 'empresa = ? AND id = ?',
+          whereArgs: [administrador['empresa'], administrador['usuario']],
+        );
+        await db.rawDelete(
+          '''DELETE FROM empresas WHERE id = ?
+          AND NOT EXISTS (SELECT 1 FROM usuarios WHERE empresa = empresas.id)
+          AND NOT EXISTS (SELECT 1 FROM productos WHERE empresa = empresas.id)''',
+          [administrador['empresa']],
+        );
+      }
+      await db.execute('''CREATE TABLE cuentas_v6 (
+        id TEXT PRIMARY KEY,
+        empresa TEXT NOT NULL,
+        usuario TEXT NOT NULL,
+        nombre_empresa TEXT NOT NULL,
+        nombre TEXT NOT NULL,
+        correo TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        sal TEXT NOT NULL,
+        hash TEXT NOT NULL,
+        iteraciones INTEGER NOT NULL CHECK(iteraciones >= 600000),
+        activa INTEGER NOT NULL DEFAULT 1 CHECK(activa IN (0, 1)),
+        rol TEXT NOT NULL DEFAULT 'propietario'
+          CHECK(rol IN ('propietario', 'encargado', 'vendedor', 'consulta')),
+        FOREIGN KEY(empresa, usuario) REFERENCES usuarios(empresa, id)
+      )''');
+      await db.execute(
+        '''INSERT INTO cuentas_v6
+        (id, empresa, usuario, nombre_empresa, nombre, correo, sal, hash, iteraciones, activa, rol)
+        SELECT id, empresa, usuario, nombre_empresa, nombre, correo, sal, hash, iteraciones, activa, rol FROM cuentas''',
+      );
+      // foreign_keys=OFF no surte efecto dentro de una transacción, y diferir
+      // las FK tampoco basta: al borrar `cuentas` cada guía cuenta como una
+      // violación que la tabla renombrada no compensa y el COMMIT falla.
+      // Se apartan las guías, se reconstruye su tabla padre y se reinsertan.
+      final guias = await db.query('guias_vistas');
+      await db.delete('guias_vistas');
+      await db.execute('DROP TABLE cuentas');
+      await db.execute('ALTER TABLE cuentas_v6 RENAME TO cuentas');
+      for (final guia in guias) {
+        await db.insert('guias_vistas', guia);
+      }
+    }
+    await db.execute(
+      "CREATE UNIQUE INDEX IF NOT EXISTS un_propietario_por_empresa ON cuentas(empresa) WHERE rol = 'propietario'",
     );
   }
 

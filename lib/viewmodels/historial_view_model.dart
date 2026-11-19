@@ -8,6 +8,7 @@ class HistorialViewModel extends ChangeNotifier {
   final NegocioRepository repositorio;
   final TipoOperacion tipo;
   List<Operacion> operaciones = const [];
+  Map<String, String> responsables = const {};
   bool cargando = true;
   String? error;
   bool _cerrado = false;
@@ -18,6 +19,7 @@ class HistorialViewModel extends ChangeNotifier {
     if (!_cerrado) notifyListeners();
     try {
       operaciones = await repositorio.obtenerOperaciones(tipo: tipo);
+      responsables = await repositorio.obtenerResponsables();
     } catch (_) {
       error = 'No pudimos cargar las operaciones. Reintenta la consulta.';
     }

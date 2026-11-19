@@ -7,6 +7,8 @@ import '../widgets/superficies_finanzasist.dart';
 import '../widgets/guia_modulo.dart';
 import '../widgets/contexto_negocio.dart';
 import '../models/guia_modulo.dart';
+import '../models/permisos.dart';
+import '../widgets/permisos_sesion.dart';
 
 import '../data/producto_repository.dart';
 import '../data/repositorio_simulado.dart';
@@ -22,6 +24,7 @@ class InventarioScreen extends StatefulWidget {
     this.empresa,
     this.correo,
     this.cerrarSesion,
+    this.gestionarUsuarios,
     this.exportarRespaldo,
     this.restaurarRespaldo,
   });
@@ -30,6 +33,7 @@ class InventarioScreen extends StatefulWidget {
   final String? empresa;
   final String? correo;
   final VoidCallback? cerrarSesion;
+  final VoidCallback? gestionarUsuarios;
   final Future<void> Function()? exportarRespaldo;
   final Future<void> Function()? restaurarRespaldo;
 
@@ -92,6 +96,8 @@ class _InventarioScreenState extends State<InventarioScreen>
 
   void _accionCuenta(String accion) {
     switch (accion) {
+      case 'usuarios':
+        widget.gestionarUsuarios?.call();
       case 'exportar':
         unawaited(widget.exportarRespaldo?.call());
       case 'restaurar':
@@ -119,11 +125,28 @@ class _InventarioScreenState extends State<InventarioScreen>
                   PopupMenuItem<String>(
                     enabled: false,
                     child: Text(
-                      '${widget.empresa}\n${widget.correo}',
+                      '${widget.empresa}\n${widget.correo}\n${PermisosSesion.rolDe(context)?.etiqueta ?? RolCuenta.propietario.etiqueta}',
                       style: TextStyle(color: colores.onSurface),
                     ),
                   ),
-                  if (widget.exportarRespaldo != null)
+                  if (widget.gestionarUsuarios != null &&
+                      PermisosSesion.permite(
+                        context,
+                        Permiso.gestionarUsuarios,
+                      ))
+                    const PopupMenuItem<String>(
+                      value: 'usuarios',
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(Icons.people_outline),
+                        title: Text('Usuarios de mi empresa'),
+                      ),
+                    ),
+                  if (widget.exportarRespaldo != null &&
+                      PermisosSesion.permite(
+                        context,
+                        Permiso.gestionarRespaldos,
+                      ))
                     const PopupMenuItem<String>(
                       key: ValueKey('menu-exportar-respaldo'),
                       value: 'exportar',
@@ -133,7 +156,11 @@ class _InventarioScreenState extends State<InventarioScreen>
                         title: Text('Exportar respaldo'),
                       ),
                     ),
-                  if (widget.restaurarRespaldo != null)
+                  if (widget.restaurarRespaldo != null &&
+                      PermisosSesion.permite(
+                        context,
+                        Permiso.gestionarRespaldos,
+                      ))
                     const PopupMenuItem<String>(
                       key: ValueKey('menu-restaurar-respaldo'),
                       value: 'restaurar',
@@ -162,11 +189,12 @@ class _InventarioScreenState extends State<InventarioScreen>
                   : _viewModel.cargar,
               icon: const Icon(Icons.refresh),
             ),
-            IconButton(
-              tooltip: 'Registrar producto',
-              onPressed: _viewModel.guardando ? null : _registrarProducto,
-              icon: const Icon(Icons.add),
-            ),
+            if (PermisosSesion.permite(context, Permiso.gestionarProductos))
+              IconButton(
+                tooltip: 'Registrar producto',
+                onPressed: _viewModel.guardando ? null : _registrarProducto,
+                icon: const Icon(Icons.add),
+              ),
           ],
         ),
         body: AnchoContenido(
@@ -323,13 +351,17 @@ class _InventarioScreenState extends State<InventarioScreen>
             indicador: const Icon(Icons.inventory_2_outlined, size: 48),
             titulo: 'Aún no tienes productos',
             descripcion:
-                'Registra tu primer producto para comenzar el inventario.',
-            accion: FilledButton.icon(
-              key: const ValueKey('registrar-desde-vacio'),
-              onPressed: _registrarProducto,
-              icon: const Icon(Icons.add),
-              label: const Text('Registrar producto'),
-            ),
+                PermisosSesion.permite(context, Permiso.gestionarProductos)
+                ? 'Registra tu primer producto para comenzar el inventario.'
+                : 'Los productos de tu empresa aparecerán aquí.',
+            accion: !PermisosSesion.permite(context, Permiso.gestionarProductos)
+                ? null
+                : FilledButton.icon(
+                    key: const ValueKey('registrar-desde-vacio'),
+                    onPressed: _registrarProducto,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Registrar producto'),
+                  ),
           ),
         );
       case EstadoInventario.conDatos:
