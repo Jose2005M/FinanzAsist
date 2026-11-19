@@ -1,13 +1,13 @@
 import 'package:flutter/foundation.dart';
 
-import '../data/administracion_local.dart';
+import '../data/administracion_dispositivo.dart';
 import '../data/autenticacion_local.dart';
 
 class AdministracionViewModel extends ChangeNotifier {
   AdministracionViewModel(this.administracion);
-  final GestionCuentas administracion;
+  final GestionDispositivo administracion;
 
-  List<CuentaResumen> cuentas = const [];
+  List<EmpresaDispositivo> empresas = const [];
   bool cargando = true;
   String? error;
 
@@ -26,9 +26,9 @@ class AdministracionViewModel extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
-      final resultado = await administracion.listarCuentas();
+      final resultado = await administracion.listarEmpresas();
       if (_cerrado || solicitud != _solicitud) return;
-      cuentas = resultado;
+      empresas = resultado;
     } on AccesoException catch (e) {
       if (_cerrado || solicitud != _solicitud) return;
       error = e.mensaje;

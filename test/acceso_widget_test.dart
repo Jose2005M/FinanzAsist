@@ -9,6 +9,8 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 class AccesoFallido extends AutenticacionLocal {
   AccesoFallido() : super(base: BaseDatosLocal(factory: databaseFactoryFfi));
+  @override
+  Future<bool> puedeCrearAdministrador() async => false;
   int llamadas = 0;
   @override
   Future<void> iniciarSesion(String correo, String clave) async {
@@ -27,6 +29,8 @@ class AccesoFallido extends AutenticacionLocal {
 
 class AccesoLento extends AutenticacionLocal {
   AccesoLento() : super(base: BaseDatosLocal(factory: databaseFactoryFfi));
+  @override
+  Future<bool> puedeCrearAdministrador() async => false;
   final respuesta = Completer<void>();
   int llamadas = 0;
   @override

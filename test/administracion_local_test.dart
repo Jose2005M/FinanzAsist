@@ -5,11 +5,14 @@ library;
 
 import 'dart:io';
 
-import 'package:finanzasist/data/administracion_local.dart';
+import 'package:finanzasist/data/administracion_dispositivo.dart';
 import 'package:finanzasist/data/autenticacion_local.dart';
 import 'package:finanzasist/data/base_datos_local.dart';
 import 'package:finanzasist/data/repositorio_sqlite.dart';
 import 'package:finanzasist/data/respaldo_local.dart';
+import 'package:finanzasist/data/usuarios_empresa.dart';
+import 'package:finanzasist/models/operacion.dart';
+import 'package:finanzasist/models/reporte_financiero.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -74,21 +77,33 @@ void main() {
       correoPropietario: propietario.correo,
       clavePropietario: clave,
     );
-    await preparar(
-      Plantilla.unPropietario,
-      null,
-      (a) => a.registrar(propietario),
-    );
+    await preparar(Plantilla.unPropietario, null, (a) async {
+      await a.registrar(propietario);
+      await UsuariosEmpresa(base: a.base, sesion: a.sesion!).crearUsuario(
+        const DatosUsuario(
+          nombre: 'Trabajador',
+          correo: 'empleado@empresa.com',
+          clave: clave,
+          rol: RolCuenta.vendedor,
+        ),
+      );
+    });
     await preparar(
       Plantilla.unPropietarioYAdmin,
       Plantilla.unPropietario,
       crearAdmin,
     );
-    await preparar(
-      Plantilla.dos,
-      Plantilla.unPropietario,
-      (a) => a.registrar(otroPropietario),
-    );
+    await preparar(Plantilla.dos, Plantilla.unPropietario, (a) async {
+      await a.registrar(otroPropietario);
+      await UsuariosEmpresa(base: a.base, sesion: a.sesion!).crearUsuario(
+        const DatosUsuario(
+          nombre: 'Consulta',
+          correo: 'consulta@otra.com',
+          clave: clave,
+          rol: RolCuenta.consulta,
+        ),
+      );
+    });
     await preparar(Plantilla.dosYAdmin, Plantilla.dos, crearAdmin);
   });
   tearDownAll(() => plantillas.delete(recursive: true));
@@ -125,22 +140,79 @@ void main() {
     clavePropietario: clave,
   );
 
-  AdministracionLocal administracion() =>
-      AdministracionLocal(base: base, sesion: auth.sesion!);
+  AdministracionDispositivo administracion() =>
+      AdministracionDispositivo(base: base, sesion: auth.sesion!);
 
   Future<String> idCuenta(String correo) async =>
-      (await administracion().listarCuentas())
-          .firstWhere((c) => c.correo == correo)
-          .id;
+      (await (await base.abrir).query(
+            'cuentas',
+            columns: ['id'],
+            where: 'correo = ?',
+            whereArgs: [correo],
+          )).single['id']
+          as String;
+
+  Future<List<CuentaResumen>> listarCuentas() async =>
+      (await administracion().listarEmpresas())
+          .expand((e) => e.cuentas)
+          .toList();
 
   group('Crear administrador', () {
-    test('no se ofrece en un dispositivo sin cuentas', () async {
-      expect(await auth.puedeCrearAdministrador(), isFalse);
-      await expectLater(
-        crearAdministrador(),
-        accesoCon('Correo o contraseña del propietario incorrectos'),
-      );
-    });
+    test(
+      'en un teléfono sin cuentas lo crea el primero, sin autorización',
+      () async {
+        expect(await auth.puedeCrearAdministrador(), isTrue);
+        expect(await auth.administradorRequiereAutorizacion(), isFalse);
+
+        await auth.crearAdministrador(administrador);
+
+        expect(auth.sesion!.esAdministrador, isTrue);
+        expect(await auth.puedeCrearAdministrador(), isFalse);
+      },
+    );
+
+    test(
+      'con cuentas en el teléfono exige la autorización de un propietario',
+      () async {
+        await registrarPropietarios();
+        expect(await auth.administradorRequiereAutorizacion(), isTrue);
+
+        await expectLater(
+          auth.crearAdministrador(administrador),
+          accesoCon('Correo o contraseña del propietario incorrectos'),
+        );
+        expect(auth.sesion, isNull);
+        expect(await auth.puedeCrearAdministrador(), isTrue);
+      },
+    );
+
+    test(
+      'el primer propietario tras el administrador adopta los datos anteriores',
+      () async {
+        // Datos locales de una versión anterior a las cuentas.
+        final anterior = RepositorioSqlite(
+          factory: databaseFactoryFfi,
+          ruta: base.ruta,
+        );
+        await anterior.crearProducto(
+          nombre: 'Arroz anterior',
+          costoCompra: 3000,
+          precioVenta: 4000,
+        );
+        await anterior.cerrar();
+        await auth.crearAdministrador(administrador);
+        auth.cerrarSesion();
+
+        await auth.registrar(propietario);
+
+        expect(auth.sesion!.empresaId, 'negocio-local');
+        final productos = await RepositorioSqlite.conSesion(
+          base: base,
+          sesion: auth.sesion!,
+        ).obtenerTodos();
+        expect(productos.single.nombre, 'Arroz anterior');
+      },
+    );
 
     test('con la autorización de un propietario inicia su sesión', () async {
       await registrarPropietarios();
@@ -155,6 +227,12 @@ void main() {
 
     test('rechaza credenciales de propietario incorrectas', () async {
       await registrarPropietarios();
+      final db = await base.abrir;
+      final antes = [
+        await db.query('cuentas'),
+        await db.query('empresas'),
+        await db.query('usuarios'),
+      ];
       for (final (correo, claveDada) in [
         (propietario.correo, 'otra frase de acceso'),
         ('nadie@empresa.com', clave),
@@ -170,6 +248,11 @@ void main() {
       }
       expect(auth.sesion, isNull);
       expect(await auth.puedeCrearAdministrador(), isTrue);
+      expect([
+        await db.query('cuentas'),
+        await db.query('empresas'),
+        await db.query('usuarios'),
+      ], antes);
     });
 
     test('un propietario desactivado no puede autorizar', () async {
@@ -265,6 +348,44 @@ void main() {
         throwsA(isA<AccesoException>()),
       );
       await expectLater(
+        repositorio.crearProducto(
+          nombre: 'Producto',
+          costoCompra: 1,
+          precioVenta: 2,
+        ),
+        throwsA(isA<AccesoException>()),
+      );
+      await expectLater(
+        repositorio.confirmarOperacion(
+          SolicitudOperacion(
+            id: 'denegada',
+            tipo: TipoOperacion.compra,
+            lineas: [
+              LineaOperacion(
+                productoId: 'producto',
+                cantidad: 1,
+                valorUnitario: 1,
+              ),
+            ],
+          ),
+        ),
+        throwsA(isA<AccesoException>()),
+      );
+      await expectLater(
+        repositorio.obtenerGastos(),
+        throwsA(isA<AccesoException>()),
+      );
+      await expectLater(
+        repositorio.obtenerReporte(
+          PeriodoReporte(desde: DateTime(2026), hasta: DateTime(2026, 12, 31)),
+        ),
+        throwsA(isA<AccesoException>()),
+      );
+      await expectLater(
+        UsuariosEmpresa(base: base, sesion: auth.sesion!).listarUsuarios(),
+        throwsA(isA<AccesoException>()),
+      );
+      await expectLater(
         RespaldoLocal(base: base).exportar(sesion: auth.sesion),
         throwsA(isA<RespaldoException>()),
       );
@@ -273,8 +394,19 @@ void main() {
     test('un propietario no puede usar la administración', () async {
       await usar(Plantilla.unPropietario);
       await auth.iniciarSesion(propietario.correo, clave);
+      await expectLater(listarCuentas(), accesoCon('Solo el administrador'));
       await expectLater(
-        administracion().listarCuentas(),
+        administracion().cambiarEstado(
+          await idCuenta('empleado@empresa.com'),
+          activa: false,
+        ),
+        accesoCon('Solo el administrador'),
+      );
+      await expectLater(
+        administracion().restablecerClave(
+          await idCuenta('empleado@empresa.com'),
+          'nueva clave segura',
+        ),
         accesoCon('Solo el administrador'),
       );
     });
@@ -287,28 +419,84 @@ void main() {
           .exportar(sesion: auth.sesion);
 
       expect(bytes, isNotEmpty);
+      final adminAuth = AutenticacionLocal(base: base);
+      addTearDown(adminAuth.dispose);
+      await adminAuth.iniciarSesion(administrador.correo, claveAdmin);
+      await expectLater(
+        RespaldoLocal(base: base).restaurar(bytes, sesion: adminAuth.sesion),
+        throwsA(isA<RespaldoException>()),
+      );
     });
   });
 
   group('Gestión de cuentas', () {
     setUp(entrarComoAdministrador);
 
-    test('lista todas las cuentas sin datos de contraseña', () async {
-      final cuentas = await administracion().listarCuentas();
+    for (final correo in [propietario.correo, 'empleado@empresa.com']) {
+      test(
+        '$correo: desactivar corta la sesión y reactivar la devuelve',
+        () async {
+          final otra = AutenticacionLocal(base: base);
+          addTearDown(otra.dispose);
+          await otra.iniciarSesion(correo, clave);
+          final repo = RepositorioSqlite.conSesion(
+            base: base,
+            sesion: otra.sesion!,
+          );
+          final id = otra.sesion!.cuentaId;
+          await repo.obtenerTodos();
+          await administracion().cambiarEstado(id, activa: false);
+          await expectLater(
+            repo.obtenerTodos(),
+            throwsA(isA<AccesoException>()),
+          );
+          await administracion().cambiarEstado(id, activa: true);
+          expect(await repo.obtenerTodos(), isEmpty);
+        },
+      );
 
-      expect(cuentas.map((c) => c.correo), [
-        'admin@finanzasist.com',
+      test('$correo: restablecer exige la nueva contraseña', () async {
+        final otra = AutenticacionLocal(base: base);
+        addTearDown(otra.dispose);
+        await otra.iniciarSesion(correo, clave);
+        final repo = RepositorioSqlite.conSesion(
+          base: base,
+          sesion: otra.sesion!,
+        );
+        await administracion().restablecerClave(
+          await idCuenta(correo),
+          'nueva clave segura',
+        );
+        await expectLater(repo.obtenerTodos(), throwsA(isA<AccesoException>()));
+        otra.cerrarSesion();
+        await expectLater(
+          otra.iniciarSesion(correo, clave),
+          accesoCon('incorrectos'),
+        );
+        await otra.iniciarSesion(correo, 'nueva clave segura');
+        expect(otra.sesion!.correo, correo);
+      });
+    }
+
+    test('agrupa propietarios y trabajadores sin la empresa interna', () async {
+      final empresas = await administracion().listarEmpresas();
+      expect(empresas.map((e) => e.nombre), ['Otra Tienda', 'Tienda Central']);
+      expect(empresas.map((e) => e.cuentas.length), [2, 2]);
+      expect(empresas.first.cuentas.map((c) => c.correo), [
         'ana@otra.com',
-        'dueno@empresa.com',
+        'consulta@otra.com',
       ]);
-      final admin = cuentas.first;
-      expect(admin.rol, RolCuenta.administrador);
-      expect(admin.propietario, 'Laura Gómez');
-      final ana = cuentas[1];
-      expect(ana.rol, RolCuenta.propietario);
-      expect(ana.empresa, 'Otra Tienda');
-      expect(ana.propietario, 'Ana Ruiz');
-      expect(ana.activa, isTrue);
+      expect(empresas.last.cuentas.map((c) => c.correo), [
+        'dueno@empresa.com',
+        'empleado@empresa.com',
+      ]);
+      for (final empresa in empresas) {
+        expect(empresa.cuentas.first.rol, RolCuenta.propietario);
+        expect(
+          empresa.cuentas.every((c) => c.rol != RolCuenta.administrador),
+          isTrue,
+        );
+      }
     });
 
     test('desactivar impide el acceso y reactivar lo devuelve', () async {
@@ -329,9 +517,7 @@ void main() {
 
       await administracion().cambiarEstado(id, activa: true);
       expect(
-        (await administracion().listarCuentas())
-            .firstWhere((c) => c.id == id)
-            .activa,
+        (await listarCuentas()).firstWhere((c) => c.id == id).activa,
         isTrue,
       );
       await duenoApp.iniciarSesion(propietario.correo, clave);
@@ -342,7 +528,7 @@ void main() {
       final admin = auth.sesion!;
       auth.cerrarSesion();
       await expectLater(
-        AdministracionLocal(base: base, sesion: admin).listarCuentas(),
+        AdministracionDispositivo(base: base, sesion: admin).listarEmpresas(),
         accesoCon('Tu sesión'),
       );
     });
@@ -374,11 +560,11 @@ void main() {
       final id = await idCuenta(administrador.correo);
       await expectLater(
         administracion().cambiarEstado(id, activa: false),
-        accesoCon('cuentas de propietario'),
+        accesoCon('cuentas de administrador'),
       );
       await expectLater(
         administracion().restablecerClave(id, 'nueva clave segura'),
-        accesoCon('cuentas de propietario'),
+        accesoCon('cuentas de administrador'),
       );
     });
 
@@ -413,21 +599,111 @@ void main() {
     });
   });
 
-  test('migra cuentas de la versión 4 como propietarias', () async {
+  test(
+    'sin propietarios activos no ofrece crear administrador ni modifica datos',
+    () async {
+      await usar(Plantilla.unPropietario);
+      final db = await base.abrir;
+      await db.update('cuentas', {'activa': 0}, where: "rol = 'propietario'");
+      final antes = [
+        await db.query('cuentas'),
+        await db.query('usuarios'),
+        await db.query('empresas'),
+      ];
+      expect(await auth.puedeCrearAdministrador(), isFalse);
+      await expectLater(
+        crearAdministrador(),
+        accesoCon('propietario incorrectos'),
+      );
+      expect([
+        await db.query('cuentas'),
+        await db.query('usuarios'),
+        await db.query('empresas'),
+      ], antes);
+    },
+  );
+
+  test('un empleado activo no puede autorizar el alta', () async {
     await usar(Plantilla.unPropietario);
-    final db = await base.abrir;
-    await db.execute('DROP INDEX un_administrador');
-    await db.execute('ALTER TABLE cuentas DROP COLUMN rol');
-    await db.execute('PRAGMA user_version = 4');
-    auth.dispose();
-    await base.cerrar();
-    base = BaseDatosLocal(factory: databaseFactoryFfi, ruta: base.ruta);
-    auth = AutenticacionLocal(base: base);
-
-    await auth.iniciarSesion(propietario.correo, clave);
-
-    expect(await (await base.abrir).getVersion(), BaseDatosLocal.version);
-    expect(auth.sesion!.esAdministrador, isFalse);
-    expect(await auth.puedeCrearAdministrador(), isTrue);
+    await expectLater(
+      auth.crearAdministrador(
+        administrador,
+        correoPropietario: 'empleado@empresa.com',
+        clavePropietario: clave,
+      ),
+      accesoCon('propietario incorrectos'),
+    );
+    expect(await (await base.abrir).query('cuentas'), hasLength(2));
   });
+
+  test(
+    'migra v6 a v7 conservando cuentas y guías; admite un solo administrador',
+    () async {
+      await usar(Plantilla.unPropietario);
+      final db = await base.abrir;
+      final cuentas = await db.query('cuentas', orderBy: 'id');
+      await db.transaction((tx) async {
+        // Reconstruye el CHECK exacto de v6, no solo el número de versión.
+        final esquema =
+            (await tx.rawQuery(
+                  "SELECT sql FROM sqlite_master WHERE name = 'cuentas' AND type = 'table'",
+                )).single['sql']
+                as String;
+        await tx.execute(
+          esquema
+              .replaceFirst('"cuentas"', 'cuentas_v6')
+              .replaceFirst(
+                'CREATE TABLE cuentas (',
+                'CREATE TABLE cuentas_v6 (',
+              )
+              .replaceFirst(", 'administrador'", ''),
+        );
+        await tx.execute('INSERT INTO cuentas_v6 SELECT * FROM cuentas');
+        await tx.execute('DROP TABLE cuentas');
+        await tx.execute('ALTER TABLE cuentas_v6 RENAME TO cuentas');
+        await tx.execute(
+          "CREATE UNIQUE INDEX un_propietario_por_empresa ON cuentas(empresa) WHERE rol = 'propietario'",
+        );
+        for (final cuenta in cuentas) {
+          await tx.insert('guias_vistas', {
+            'cuenta': cuenta['id'],
+            'modulo': 'inventario',
+          });
+        }
+        await tx.execute('PRAGMA user_version = 6');
+      });
+      final guias = await db.query('guias_vistas', orderBy: 'cuenta');
+      await base.cerrar();
+      final migrada = await base.abrir;
+      expect(await migrada.getVersion(), BaseDatosLocal.version);
+      expect(await migrada.query('cuentas', orderBy: 'id'), cuentas);
+      expect(await migrada.query('guias_vistas', orderBy: 'cuenta'), guias);
+      expect(await migrada.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+      await crearAdministrador();
+      final admin = (await migrada.query(
+        'cuentas',
+        where: "rol = 'administrador'",
+      )).single;
+      await expectLater(
+        migrada.insert(
+          'cuentas',
+          Map<String, Object?>.from(admin)
+            ..addAll({'id': 'otro-admin', 'correo': 'otro-admin@empresa.com'}),
+        ),
+        throwsA(isA<DatabaseException>()),
+      );
+      // Repetir la migración sobre el esquema ya actualizado es idempotente.
+      await migrada.execute('PRAGMA user_version = 6');
+      await base.cerrar();
+      expect(await (await base.abrir).query('cuentas'), hasLength(3));
+      expect(
+        await (await base.abrir).query('guias_vistas', orderBy: 'cuenta'),
+        guias,
+      );
+      expect(
+        await (await base.abrir).rawQuery('PRAGMA foreign_key_check'),
+        isEmpty,
+      );
+    },
+  );
 }

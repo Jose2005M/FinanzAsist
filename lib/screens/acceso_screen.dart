@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data/autenticacion_local.dart';
-import '../widgets/acciones_respaldo.dart';
 import 'crear_administrador_screen.dart';
+import '../widgets/acciones_respaldo.dart';
+
 import '../widgets/marca_finanzasist.dart';
 import '../theme/tema_finanzasist.dart';
 import '../widgets/superficies_finanzasist.dart';
@@ -12,7 +13,7 @@ class AccesoScreen extends StatefulWidget {
   const AccesoScreen({super.key, required this.autenticacion, this.respaldo});
   final AutenticacionLocal autenticacion;
 
-  /// Permite restaurar un respaldo solo si el dispositivo no tiene cuentas.
+  /// Permite agregar una empresa desde su respaldo sin alterar otras empresas.
   final AccionesRespaldo? respaldo;
 
   @override
@@ -33,30 +34,43 @@ class _AccesoScreenState extends State<AccesoScreen> {
   bool _verClave = false;
   String? _error;
   bool _restaurando = false;
-  late Future<bool> _restaurable = _consultarRestauracion();
-  late final Future<bool> _administrable = _consultarAdministrador();
+  late Future<bool> _administradorDisponible = _consultarAdministrador();
 
   Future<bool> _consultarAdministrador() async {
     try {
       return await widget.autenticacion.puedeCrearAdministrador();
     } on Exception {
-      // Si la base no abre, el acceso ya muestra su propio error.
       return false;
     }
   }
 
   Future<void> _crearAdministrador() async {
-    if (_ocupado || _restaurando) return;
-    FocusScope.of(context).unfocus();
-    // Al crearse, la sesión del administrador reemplaza esta pantalla.
+    bool requiereAutorizacion;
+    try {
+      requiereAutorizacion = await widget.autenticacion
+          .administradorRequiereAutorizacion();
+    } on Exception {
+      // Ante la duda se pide autorización; el servicio decide al final.
+      requiereAutorizacion = true;
+    }
+    if (!mounted) return;
     await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (_) =>
-            CrearAdministradorScreen(autenticacion: widget.autenticacion),
+        builder: (_) => CrearAdministradorScreen(
+          autenticacion: widget.autenticacion,
+          requiereAutorizacion: requiereAutorizacion,
+        ),
       ),
     );
+    if (mounted) {
+      // Cuerpo de bloque: una flecha devolvería el Future a setState.
+      setState(() {
+        _administradorDisponible = _consultarAdministrador();
+      });
+    }
   }
 
+  late Future<bool> _restaurable = _consultarRestauracion();
   Future<bool> _consultarRestauracion() async {
     final respaldo = widget.respaldo;
     if (respaldo == null) return false;
@@ -77,6 +91,7 @@ class _AccesoScreenState extends State<AccesoScreen> {
     setState(() {
       _restaurando = false;
       _restaurable = _consultarRestauracion();
+      _administradorDisponible = _consultarAdministrador();
     });
     if (restaurado && _registro) _cambiarModo();
   }
@@ -235,7 +250,20 @@ class _AccesoScreenState extends State<AccesoScreen> {
                           const SizedBox(height: 24),
                           _informacionLocal(),
                           _opcionRestaurar(),
-                          _opcionAdministrador(),
+                          FutureBuilder<bool>(
+                            future: _administradorDisponible,
+                            builder: (context, estado) => estado.data == true
+                                ? TextButton(
+                                    key: const ValueKey(
+                                      'crear-administrador-acceso',
+                                    ),
+                                    onPressed: _ocupado || _restaurando
+                                        ? null
+                                        : _crearAdministrador,
+                                    child: const Text('Crear administrador'),
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
                         ],
                       ),
                     ),
@@ -561,26 +589,6 @@ class _AccesoScreenState extends State<AccesoScreen> {
     ],
   );
 
-  Widget _opcionAdministrador() => FutureBuilder<bool>(
-    future: _administrable,
-    builder: (context, consulta) {
-      if (consulta.data != true) return const SizedBox.shrink();
-      return Padding(
-        padding: const EdgeInsets.only(top: 4),
-        child: TextButton.icon(
-          key: const ValueKey('crear-administrador-acceso'),
-          onPressed: _ocupado || _restaurando ? null : _crearAdministrador,
-          icon: const Icon(Icons.admin_panel_settings_outlined),
-          style: TextButton.styleFrom(
-            foregroundColor: ColoresFinanzAsist.secundaria,
-            minimumSize: const Size.fromHeight(48),
-          ),
-          label: const Text('Crear administrador'),
-        ),
-      );
-    },
-  );
-
   Widget _opcionRestaurar() => FutureBuilder<bool>(
     future: _restaurable,
     builder: (context, consulta) {
@@ -619,7 +627,7 @@ class _AccesoScreenState extends State<AccesoScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Tus datos se guardan en este dispositivo.\nSin sincronización ni recuperación por correo. Exporta respaldos desde el menú de tu cuenta.',
+                'Tus datos se guardan en este dispositivo.\nSin sincronización ni recuperación por correo. El propietario puede exportar respaldos de su empresa desde el menú de su cuenta.',
                 style: TextStyle(
                   fontSize: 13,
                   height: 1.45,

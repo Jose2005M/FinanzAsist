@@ -7,6 +7,8 @@ import '../models/guia_modulo.dart';
 
 import '../data/negocio_repository.dart';
 import '../models/operacion.dart';
+import '../models/permisos.dart';
+import '../widgets/permisos_sesion.dart';
 import '../utils/formato_moneda.dart';
 import '../utils/formato_operacion.dart';
 import '../viewmodels/historial_view_model.dart';
@@ -96,7 +98,13 @@ class _OperacionesScreenState extends State<OperacionesScreen>
     builder: (context, _) => Scaffold(
       appBar: AppBar(
         leading: ContextoNegocio.volverAInventario(context),
-        title: Text(compra ? 'Compras' : 'Ventas'),
+        title: Text(
+          compra
+              ? 'Compras'
+              : PermisosSesion.rolDe(context) == RolCuenta.vendedor
+              ? 'Tus ventas'
+              : 'Ventas',
+        ),
       ),
       body: AnchoContenido(
         child: SafeArea(
@@ -110,6 +118,8 @@ class _OperacionesScreenState extends State<OperacionesScreen>
                   CabeceraModulo(
                     titulo: compra
                         ? 'Historial de compras'
+                        : PermisosSesion.rolDe(context) == RolCuenta.vendedor
+                        ? 'Tus ventas'
                         : 'Historial de ventas',
                     descripcion:
                         'Consulta las operaciones confirmadas de tu empresa.',
@@ -118,14 +128,18 @@ class _OperacionesScreenState extends State<OperacionesScreen>
                         : Icons.point_of_sale,
                   ),
                   const SizedBox(height: 20),
-                  FilledButton.icon(
-                    key: ValueKey(compra ? 'nueva-compra' : 'nueva-venta'),
-                    onPressed: _nueva,
-                    icon: const Icon(Icons.add),
-                    label: Text(
-                      compra ? 'Registrar compra' : 'Registrar venta',
+                  if (PermisosSesion.permite(
+                    context,
+                    compra ? Permiso.registrarCompras : Permiso.registrarVentas,
+                  ))
+                    FilledButton.icon(
+                      key: ValueKey(compra ? 'nueva-compra' : 'nueva-venta'),
+                      onPressed: _nueva,
+                      icon: const Icon(Icons.add),
+                      label: Text(
+                        compra ? 'Registrar compra' : 'Registrar venta',
+                      ),
                     ),
-                  ),
                   const SizedBox(height: 16),
                   GuiaModulo(
                     modulo: compra ? ModuloGuia.compras : ModuloGuia.ventas,
@@ -159,7 +173,11 @@ class _OperacionesScreenState extends State<OperacionesScreen>
                               '${d['nombre']}\n${d['cantidad']} unidades × ${formatearPesos(pesos(d['valorCentavos'] as int))}',
                             ),
                           ),
-                        if (!compra) ...[
+                        if (!compra &&
+                            PermisosSesion.permite(
+                              context,
+                              Permiso.verCostos,
+                            )) ...[
                           for (final d in o.detalles)
                             Text(
                               'Costo asignado por unidad de ${d['nombre']}: ${formatearPesos(pesos((d['costoAsignadoCentavos'] ?? d['costoCatalogoCentavos']) as int))}',
@@ -176,7 +194,11 @@ class _OperacionesScreenState extends State<OperacionesScreen>
                         Text(
                           'Total: ${formatearPesos(pesos(o.totalCentavos))}',
                         ),
-                        if (!compra) ...[
+                        if (!compra &&
+                            PermisosSesion.permite(
+                              context,
+                              Permiso.verCostos,
+                            )) ...[
                           Text(
                             'Costo de ventas: ${formatearPesos(pesos(o.costoVentasCentavos))}',
                           ),
@@ -189,7 +211,9 @@ class _OperacionesScreenState extends State<OperacionesScreen>
                           ),
                         ],
                         const SizedBox(height: 12),
-                        Text('Responsable: ${o.usuarioId}'),
+                        Text(
+                          'Responsable: ${_vm.responsables[o.usuarioId] ?? 'Usuario anterior'}',
+                        ),
                         SelectableText('Operación: ${o.id}'),
                       ],
                     ),

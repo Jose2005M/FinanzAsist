@@ -1,7 +1,7 @@
 # Manual de usuario de FinanzAsist
 
 - **Equipo:** Los Juanchos · Ingeniería Informática, UNIPAZ.
-- **Versión del manual:** 4 · 16 de noviembre de 2026.
+- **Versión del manual:** 5 · 19 de noviembre de 2026.
 - **Alcance:** cuentas locales, acceso, productos, inventario, compras, ventas, costos históricos, gastos y reportes.
 - **Estado:** preparado a partir de la aplicación actual; revisión del equipo y validación con usuarios pendientes.
 
@@ -36,25 +36,58 @@ Abre FinanzAsist en el teléfono o emulador Android donde el equipo haya instala
 
 El correo identifica tu cuenta en este dispositivo: se ignoran las mayúsculas y los espacios de los extremos. Si ya está registrado, utiliza **Ya tengo cuenta · Iniciar sesión**. Los errores de validación conservan los demás datos escritos.
 
-La primera cuenta vincula los registros de la empresa local anterior, si existen. Sus movimientos históricos conservan el responsable original; los registros nuevos utilizan tu usuario. Las demás cuentas empiezan con una empresa vacía y no muestran los datos de las otras.
+La primera cuenta vincula los registros de la empresa local anterior, si existen. Sus movimientos históricos conservan el responsable original; los registros nuevos utilizan tu usuario. Las demás cuentas creadas desde el registro público empiezan con una empresa vacía. Los empleados creados por el propietario comparten los datos de su empresa, según su rol.
 
 ### Entrar y salir
 
 Para entrar, escribe el correo y la contraseña en **Inicia sesión** y pulsa **Iniciar sesión**. En Inventario verás el nombre de tu empresa. Para salir, abre **Cuenta de empresa**, el icono de usuario de la barra superior, y selecciona **Cerrar sesión**. La aplicación vuelve al acceso y retira el historial de pantallas privadas.
 
-Las cuentas se guardan en este dispositivo. Al reiniciar la aplicación deberás entrar de nuevo. El correo se utiliza como identificador; no se envía un mensaje de verificación y no existe recuperación de contraseña por correo. Guarda tus credenciales: nadie puede recuperar la contraseña original, aunque el administrador puede asignarte una nueva.
+Las cuentas se guardan en este dispositivo. Al reiniciar la aplicación deberás entrar de nuevo. El correo se utiliza como identificador; no se envía un mensaje de verificación y no existe recuperación de contraseña por correo. Guarda tus credenciales: nadie puede recuperar la contraseña original, aunque el propietario puede asignar una nueva a sus empleados.
 
-### Cuenta de administrador
+### Usuarios y roles de la empresa
 
-Cada dispositivo puede tener **un** administrador. Su función es gestionar las cuentas, no los negocios: no ve inventario, compras, ventas, gastos ni reportes.
+Cada empresa tiene un propietario y puede tener varios empleados, cada uno con su correo y contraseña. El correo es único en todo el dispositivo. El menú **Cuenta de empresa** muestra tu rol; las pestañas y acciones disponibles dependen de él.
 
-- **Crearlo:** en la pantalla de acceso pulsa **Crear administrador**. La opción aparece cuando ya existe al menos una cuenta de propietario y todavía no hay administrador. Escribe el correo y la contraseña de un propietario activo, que autoriza la creación, y luego el nombre, el correo y la contraseña del administrador. Al terminar se abre su panel.
-- **Entrar:** el administrador usa la misma pantalla **Inicia sesión** con su correo y contraseña.
-- **Usuarios registrados:** el panel muestra cada cuenta con su empresa, propietario, correo y estado. Nunca muestra contraseñas.
-- **Desactivar o activar:** una cuenta desactivada no puede entrar; al intentarlo con la contraseña correcta verá «Esta cuenta está desactivada». Si tenía la sesión abierta, su siguiente operación la cierra. Sus datos se conservan.
-- **Restablecer contraseña:** asigna una contraseña nueva de 8 a 128 caracteres y comunícala al propietario por un medio seguro. La anterior deja de funcionar.
+| Acción | Propietario | Encargado de inventario | Vendedor | Consulta |
+| --- | --- | --- | --- | --- |
+| Ver inventario, existencias, precios de venta y movimientos | Sí | Sí | Sí | Sí |
+| Ver costos | Sí | Sí | No | Sí |
+| Crear y editar productos | Sí | Sí | No | No |
+| Registrar existencias iniciales y ajustes | Sí | Sí | No | No |
+| Ver compras | Sí | Sí | No | Sí |
+| Registrar compras | Sí | Sí | No | No |
+| Ver ventas | Todas | Todas | Solo las propias | Todas |
+| Registrar ventas | Sí | No | Sí | No |
+| Ver gastos y reportes | Sí | Sí | No | Sí |
+| Registrar gastos | Sí | No | No | No |
+| Gestionar usuarios y respaldos | Sí | No | No | No |
 
-El administrador no puede desactivarse ni cambiar su propia contraseña desde el panel.
+Como propietario, abre **Cuenta de empresa → Usuarios de mi empresa**:
+
+- **Crear usuario:** completa nombre, correo, contraseña de 8 a 128 caracteres y elige Encargado de inventario, Vendedor o Consulta. El selector explica las capacidades de cada rol. El empleado entra desde **Inicia sesión** y comparte el negocio de la empresa.
+- **Cambiar rol:** selecciona otro rol de empleado. La sesión anterior deja de ser válida en su siguiente consulta; debe volver a entrar para utilizar sus nuevos permisos.
+- **Desactivar o activar:** confirma la desactivación. El empleado no podrá entrar y su siguiente operación con una sesión abierta será rechazada. Sus registros se conservan; puedes activarlo de nuevo.
+- **Restablecer contraseña:** asigna una contraseña nueva de 8 a 128 caracteres y comunícala al empleado por un medio seguro. La anterior deja de funcionar.
+
+La lista muestra nombre, correo, rol y estado **Activa/Desactivada**, con el propietario primero. No muestra contraseñas. Solo puedes gestionar empleados de tu empresa; no puedes modificar al propietario ni crear otro propietario desde esta pantalla. El administrador del dispositivo se gestiona por separado.
+
+### Administrador del dispositivo
+
+Solo puede existir un administrador por teléfono. En la pantalla de acceso, **Crear administrador** aparece mientras todavía no exista uno:
+
+- **Teléfono sin cuentas:** quien lo cree primero queda como administrador; solo se piden su nombre, correo y contraseña.
+- **Teléfono con empresas registradas:** además se pide el correo y la contraseña de un propietario activo para autorizar el alta. Esto evita que alguien con el teléfono en la mano se haga administrador, restablezca la contraseña de un propietario y entre a su negocio.
+
+El correo del administrador debe ser único en el dispositivo. Al terminar, se inicia su sesión.
+
+El administrador entra únicamente al panel **Usuarios del dispositivo**. Las cuentas se agrupan por empresa, con su propietario y trabajadores, mostrando nombre, correo, rol y estado **Activa/Desactivada**. Su propia cuenta aparece aparte como **Administrador (tú)**, sin acciones. No tiene negocio propio ni acceso a inventario, compras, ventas, gastos, reportes, respaldos o gestión de usuarios de una empresa.
+
+- **Desactivar o activar:** puede hacerlo sobre propietarios y trabajadores de cualquier empresa. Desactivar pide confirmación, conserva los datos y bloquea el acceso y la siguiente operación de una sesión abierta. Reactivar permite volver a usar la cuenta.
+- **Restablecer contraseña:** escribe dos veces una contraseña nueva de 8 a 128 caracteres y comunícala a la persona por un medio seguro. La anterior deja de funcionar y deberá iniciar sesión con la nueva.
+
+El administrador no crea usuarios, no cambia roles y no puede modificar su propia cuenta desde el panel. Nunca se muestran contraseñas, sales ni hashes. Usa **Cerrar sesión** para volver al acceso.
+
+El vendedor ve **Tus ventas**, con el nombre del responsable y sin costos ni utilidad. Las ventas conservan internamente su costo real para los reportes del propietario.
 
 | Forma de uso | Qué ocurre con los datos |
 | --- | --- |
@@ -66,17 +99,16 @@ El equipo selecciona el modo al ejecutar la aplicación; no existe un interrupto
 
 Los datos de Android se guardan en el dispositivo. Esta versión no ofrece sincronización, pero sí respaldos manuales:
 
-- **Exportar respaldo:** en **Inventario**, abre el menú de la cuenta (icono de persona) y elige **Exportar respaldo**. Elige dónde guardar el archivo `finanzasist-respaldo-AAAA-MM-DD-HHMM.db`, por ejemplo en Google Drive o en una memoria. El archivo contiene todos los datos del negocio y las cuentas del dispositivo: guárdalo en un lugar seguro.
-- **Restaurar respaldo:** desde el mismo menú, elige **Restaurar respaldo** y el archivo. Tras confirmar, todos los datos del dispositivo se reemplazan por los del respaldo y debes iniciar sesión con una cuenta del respaldo. No se puede deshacer: exporta antes si quieres conservar los datos actuales.
-- **En un teléfono nuevo o recién instalado,** la pantalla de acceso muestra **Restaurar un respaldo** mientras no exista ninguna cuenta.
+- **Exportar respaldo:** como propietario, abre el menú de la cuenta y elige **Exportar respaldo**. Guarda el archivo `finanzasist-<empresa>-AAAA-MM-DD-HHMM.db` en un lugar seguro. Contiene únicamente los datos y las cuentas de tu empresa (propietario y empleados), incluidas sus preferencias de guías. No incluye otras empresas ni al administrador del dispositivo, aunque compartan teléfono.
+- **Restaurar tu empresa:** inicia sesión como propietario y elige **Restaurar respaldo**. Solo se admite un respaldo con el mismo identificador de empresa. Tras confirmar, se reemplazan las cuentas, productos, compras, ventas y gastos de tu empresa. Las otras empresas y el administrador quedan intactos. La sesión se cierra y debes entrar con una cuenta del respaldo. Exporta antes si quieres conservar el estado actual.
+- **Agregar una empresa desde el acceso:** **Restaurar un respaldo** permite agregar una empresa que aún no esté en el teléfono, incluso si ya hay otras empresas. No reemplaza datos existentes. Si esa empresa ya existe, inicia sesión como su propietario para restaurarla. Los correos de sus cuentas no deben estar usados por otras empresas ni por el administrador.
 
-La aplicación rechaza archivos dañados, de otras aplicaciones o creados por una versión más nueva, y en esos casos conserva los datos actuales. Los respaldos solo están disponibles cuando el dispositivo tiene una sola cuenta de empresa. Exporta un respaldo antes de borrar los datos de la aplicación o desinstalarla.
-
+Solo el propietario puede exportar y restaurar dentro de una sesión; vendedores, encargados, consulta y administrador no pueden hacerlo. Se aceptan respaldos antiguos de dispositivo completo si contienen una sola empresa de negocio; el administrador del archivo no se importa. Los respaldos antiguos sin cuenta de propietario solo se pueden importar en un teléfono sin cuentas. Se rechazan respaldos con varias empresas, archivos dañados, de otras aplicaciones o de una versión más nueva, conservando los datos actuales si falla la restauración. Exporta antes de borrar los datos de la aplicación o desinstalarla.
 ## 2. Moverse por la aplicación
 
 En la primera visita a cada módulo verás una guía con su propósito y cómo empezar. Pulsa **Ver pasos** para ampliar las instrucciones o **Entendido** para ocultarlas. Puedes consultarlas después desde **Guía de Inventario**, **Guía de Compras**, **Guía de Ventas**, **Guía de Gastos** o **Guía de Reportes**. La aplicación recuerda esta elección para tu cuenta.
 
-Después de iniciar sesión aparece **Inventario**. La barra inferior permanece disponible en todos los módulos y sus formularios:
+Después de iniciar sesión aparece **Inventario**. La barra inferior permanece disponible en los módulos y sus formularios, y muestra solo los destinos permitidos para tu rol:
 
 | Destino | Para qué sirve |
 | --- | --- |
@@ -343,7 +375,7 @@ Anota el módulo, la fecha, los productos o concepto y los valores esperados y r
 
 ## 13. Funciones pendientes y ayuda
 
-Todavía no están disponibles el acceso desde otros dispositivos, la recuperación de contraseña, la edición de cuentas y empresas, los usuarios adicionales y permisos por rol, las categorías administrables, los clientes, los proveedores, los gráficos, las anulaciones, la exportación y la sincronización. Los métodos de costo FIFO y promedio ponderado requieren una decisión posterior del equipo.
+Todavía no están disponibles el acceso desde otros dispositivos, la recuperación de contraseña, la edición de cuentas y empresas, las categorías administrables, los clientes, los proveedores, los gráficos, las anulaciones y la sincronización. Los métodos de costo FIFO y promedio ponderado requieren una decisión posterior del equipo.
 
 Para pedir ayuda a Los Juanchos, registra qué pantalla utilizabas, qué acción intentaste, qué mensaje apareció y qué resultado esperabas. Si adjuntas una captura, evita incluir datos personales o información de otros negocios.
 

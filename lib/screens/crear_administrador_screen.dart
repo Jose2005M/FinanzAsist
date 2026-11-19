@@ -4,11 +4,17 @@ import '../data/autenticacion_local.dart';
 import '../theme/tema_finanzasist.dart';
 import '../widgets/superficies_finanzasist.dart';
 
-/// Crea la única cuenta de administrador con la autorización de un
-/// propietario. Al terminar, la sesión del administrador queda iniciada.
+/// Crea la única cuenta de administrador. En un teléfono sin cuentas no pide
+/// autorización; con empresas, la de un propietario. Al terminar, la sesión
+/// del administrador queda iniciada.
 class CrearAdministradorScreen extends StatefulWidget {
-  const CrearAdministradorScreen({super.key, required this.autenticacion});
+  const CrearAdministradorScreen({
+    super.key,
+    required this.autenticacion,
+    this.requiereAutorizacion = true,
+  });
   final AutenticacionLocal autenticacion;
+  final bool requiereAutorizacion;
 
   @override
   State<CrearAdministradorScreen> createState() =>
@@ -55,8 +61,12 @@ class _CrearAdministradorScreenState extends State<CrearAdministradorScreen> {
           correo: _correo.text,
           clave: _clave.text,
         ),
-        correoPropietario: _correoPropietario.text,
-        clavePropietario: _clavePropietario.text,
+        correoPropietario: widget.requiereAutorizacion
+            ? _correoPropietario.text
+            : null,
+        clavePropietario: widget.requiereAutorizacion
+            ? _clavePropietario.text
+            : null,
       );
       if (mounted) Navigator.pop(context, true);
     } on AccesoException catch (e) {
@@ -107,40 +117,43 @@ class _CrearAdministradorScreenState extends State<CrearAdministradorScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const CabeceraModulo(
+                CabeceraModulo(
                   titulo: 'Cuenta de administrador',
                   descripcion:
                       'Verá los usuarios de este dispositivo y podrá '
                       'desactivarlos o restablecer su contraseña. Solo puede '
-                      'existir uno y necesita la autorización de un propietario.',
+                      'existir uno'
+                      '${widget.requiereAutorizacion ? ' y, como ya hay empresas, necesita la autorización de un propietario.' : ': quien lo cree primero queda como administrador.'}',
                   icono: Icons.admin_panel_settings_outlined,
                 ),
                 const SizedBox(height: 24),
-                PanelFinanzas(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _titulo('Autorización del propietario'),
-                      _campo(
-                        clave: 'correo-propietario',
-                        etiqueta: 'Correo del propietario',
-                        controlador: _correoPropietario,
-                        teclado: TextInputType.emailAddress,
-                        validar: DatosRegistro.validarCorreo,
-                      ),
-                      _campo(
-                        clave: 'clave-propietario',
-                        etiqueta: 'Contraseña del propietario',
-                        controlador: _clavePropietario,
-                        secreto: true,
-                        validar: (valor) => (valor ?? '').isEmpty
-                            ? 'Escribe la contraseña del propietario.'
-                            : null,
-                      ),
-                    ],
+                if (widget.requiereAutorizacion) ...[
+                  PanelFinanzas(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _titulo('Autorización del propietario'),
+                        _campo(
+                          clave: 'correo-propietario',
+                          etiqueta: 'Correo del propietario',
+                          controlador: _correoPropietario,
+                          teclado: TextInputType.emailAddress,
+                          validar: DatosRegistro.validarCorreo,
+                        ),
+                        _campo(
+                          clave: 'clave-propietario',
+                          etiqueta: 'Contraseña del propietario',
+                          controlador: _clavePropietario,
+                          secreto: true,
+                          validar: (valor) => (valor ?? '').isEmpty
+                              ? 'Escribe la contraseña del propietario.'
+                              : null,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
+                ],
                 PanelFinanzas(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../data/negocio_repository.dart';
 import '../models/operacion.dart';
+import '../models/permisos.dart';
+import '../widgets/permisos_sesion.dart';
 import '../widgets/contexto_negocio.dart';
 import 'gastos_screen.dart';
 import 'inventario_screen.dart';
@@ -16,6 +18,7 @@ class NegocioScreen extends StatefulWidget {
     this.empresa,
     this.correo,
     this.cerrarSesion,
+    this.gestionarUsuarios,
     this.exportarRespaldo,
     this.restaurarRespaldo,
   });
@@ -23,6 +26,7 @@ class NegocioScreen extends StatefulWidget {
   final String? empresa;
   final String? correo;
   final VoidCallback? cerrarSesion;
+  final VoidCallback? gestionarUsuarios;
   final Future<void> Function()? exportarRespaldo;
   final Future<void> Function()? restaurarRespaldo;
 
@@ -50,7 +54,7 @@ class _NegocioScreenState extends State<NegocioScreen> {
   ];
 
   void _seleccionar(int modulo) {
-    if (!mounted || modulo == _seleccion) return;
+    if (!mounted || modulo == _seleccion || !_modulos.contains(modulo)) return;
     if (_control.guardando) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -97,6 +101,7 @@ class _NegocioScreenState extends State<NegocioScreen> {
       empresa: widget.empresa,
       correo: widget.correo,
       cerrarSesion: widget.cerrarSesion,
+      gestionarUsuarios: widget.gestionarUsuarios,
       exportarRespaldo: widget.exportarRespaldo,
       restaurarRespaldo: widget.restaurarRespaldo,
     ),
@@ -109,41 +114,57 @@ class _NegocioScreenState extends State<NegocioScreen> {
     _ => ReportesScreen(key: _pantallas[4], repositorio: widget.repositorio),
   };
 
+  List<int> get _modulos => [
+    0,
+    if (PermisosSesion.permite(context, Permiso.verCompras)) 1,
+    if (PermisosSesion.permite(context, Permiso.registrarVentas) ||
+        PermisosSesion.permite(context, Permiso.verTodasLasVentas) ||
+        PermisosSesion.permite(context, Permiso.verVentasPropias))
+      2,
+    if (PermisosSesion.permite(context, Permiso.verGastos)) 3,
+    if (PermisosSesion.permite(context, Permiso.verReportes)) 4,
+  ];
+
   Widget _barra(BuildContext context) {
+    final modulos = _modulos;
     final grande = MediaQuery.textScalerOf(context).scale(12) > 16;
     final barra = NavigationBar(
-      selectedIndex: _seleccion,
-      onDestinationSelected: _seleccionar,
+      selectedIndex: modulos.indexOf(_seleccion),
+      onDestinationSelected: (indice) => _seleccionar(modulos[indice]),
       height: grande ? 72 : 80,
       labelBehavior: grande
           ? NavigationDestinationLabelBehavior.alwaysHide
           : NavigationDestinationLabelBehavior.alwaysShow,
-      destinations: const [
-        NavigationDestination(
+      destinations: [
+        const NavigationDestination(
           key: ValueKey('modulo-inventario'),
           icon: Icon(Icons.inventory_2_outlined),
           label: 'Inventario',
         ),
-        NavigationDestination(
-          key: ValueKey('modulo-compras'),
-          icon: Icon(Icons.shopping_bag_outlined),
-          label: 'Compras',
-        ),
-        NavigationDestination(
-          key: ValueKey('modulo-ventas'),
-          icon: Icon(Icons.point_of_sale),
-          label: 'Ventas',
-        ),
-        NavigationDestination(
-          key: ValueKey('modulo-gastos'),
-          icon: Icon(Icons.receipt_long_outlined),
-          label: 'Gastos',
-        ),
-        NavigationDestination(
-          key: ValueKey('modulo-reportes'),
-          icon: Icon(Icons.assessment_outlined),
-          label: 'Reportes',
-        ),
+        if (modulos.contains(1))
+          const NavigationDestination(
+            key: ValueKey('modulo-compras'),
+            icon: Icon(Icons.shopping_bag_outlined),
+            label: 'Compras',
+          ),
+        if (modulos.contains(2))
+          const NavigationDestination(
+            key: ValueKey('modulo-ventas'),
+            icon: Icon(Icons.point_of_sale),
+            label: 'Ventas',
+          ),
+        if (modulos.contains(3))
+          const NavigationDestination(
+            key: ValueKey('modulo-gastos'),
+            icon: Icon(Icons.receipt_long_outlined),
+            label: 'Gastos',
+          ),
+        if (modulos.contains(4))
+          const NavigationDestination(
+            key: ValueKey('modulo-reportes'),
+            icon: Icon(Icons.assessment_outlined),
+            label: 'Reportes',
+          ),
       ],
     );
     if (!grande) return barra;

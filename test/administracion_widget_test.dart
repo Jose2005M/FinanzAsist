@@ -1,4 +1,6 @@
-import 'package:finanzasist/data/administracion_local.dart';
+import 'dart:async';
+
+import 'package:finanzasist/data/administracion_dispositivo.dart';
 import 'package:finanzasist/data/autenticacion_local.dart';
 import 'package:finanzasist/data/base_datos_local.dart';
 import 'package:finanzasist/screens/acceso_screen.dart';
@@ -8,7 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-class GestionFalsa implements GestionCuentas {
+class GestionFalsa implements GestionDispositivo {
   GestionFalsa({this.fallarCarga = false, this.errorAccion});
   bool fallarCarga;
   AccesoException? errorAccion;
@@ -33,9 +35,20 @@ class GestionFalsa implements GestionCuentas {
   ];
 
   @override
-  Future<List<CuentaResumen>> listarCuentas() async {
+  Future<List<EmpresaDispositivo>> listarEmpresas() async {
     if (fallarCarga) throw const AccesoException('Tu sesión no es válida.');
-    return List.unmodifiable(cuentas);
+    final nombres = cuentas
+        .where((c) => c.rol != RolCuenta.administrador)
+        .map((c) => c.empresa)
+        .toSet();
+    return [
+      for (final nombre in nombres)
+        EmpresaDispositivo(
+          id: nombre,
+          nombre: nombre,
+          cuentas: List.unmodifiable(cuentas.where((c) => c.empresa == nombre)),
+        ),
+    ];
   }
 
   @override
@@ -64,24 +77,38 @@ class GestionFalsa implements GestionCuentas {
 }
 
 class AutenticacionFalsa extends AutenticacionLocal {
-  AutenticacionFalsa({this.permiteAdministrador = true, this.error})
-    : super(base: BaseDatosLocal(factory: databaseFactoryFfi));
+  AutenticacionFalsa({
+    this.permiteAdministrador = true,
+    this.requiereAutorizacion = true,
+    this.error,
+  }) : super(base: BaseDatosLocal(factory: databaseFactoryFfi));
   final bool permiteAdministrador;
+  final bool requiereAutorizacion;
   final AccesoException? error;
-  final llamadas = <(DatosAdministrador, String, String)>[];
+  final llamadas = <(DatosAdministrador, String?, String?)>[];
 
   @override
   Future<bool> puedeCrearAdministrador() async => permiteAdministrador;
 
   @override
+  Future<bool> administradorRequiereAutorizacion() async =>
+      requiereAutorizacion;
+
+  @override
   Future<void> crearAdministrador(
     DatosAdministrador datos, {
-    required String correoPropietario,
-    required String clavePropietario,
+    String? correoPropietario,
+    String? clavePropietario,
   }) async {
     llamadas.add((datos, correoPropietario, clavePropietario));
     if (error case final error?) throw error;
   }
+}
+
+class GestionPendiente extends GestionFalsa {
+  final respuesta = Completer<List<EmpresaDispositivo>>();
+  @override
+  Future<List<EmpresaDispositivo>> listarEmpresas() => respuesta.future;
 }
 
 void main() {
@@ -102,6 +129,7 @@ void main() {
         MaterialApp(
           home: AdministracionScreen(
             administracion: gestion,
+            administrador: gestion.cuentas.first,
             cerrarSesion: cerrarSesion ?? () {},
           ),
         ),
@@ -132,8 +160,31 @@ void main() {
         find.byKey(const ValueKey('estado-admin@finanzasist.com')),
         findsNothing,
       );
+      expect(
+        find.byKey(const ValueKey('clave-admin@finanzasist.com')),
+        findsNothing,
+      );
       expect(estadoDueno, findsOneWidget);
       expect(claveDueno, findsOneWidget);
+    });
+
+    testWidgets('muestra carga mientras espera la consulta', (tester) async {
+      final gestion = GestionPendiente();
+      pantallaMovil(tester);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AdministracionScreen(
+            administracion: gestion,
+            administrador: gestion.cuentas.first,
+            cerrarSesion: () {},
+          ),
+        ),
+      );
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      gestion.respuesta.complete(const []);
+      await tester.pumpAndSettle();
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.text('Administrador (tú)'), findsOneWidget);
     });
 
     testWidgets('desactivar pide confirmación y actualiza el estado', (
@@ -158,6 +209,65 @@ void main() {
       await tocar(tester, estadoDueno);
       expect(gestion.cuentas[1].activa, isTrue);
     });
+
+    testWidgets(
+      'agrupa trabajadores con su propietario a 360 dp y tolera textos largos',
+      (tester) async {
+        final gestion = GestionFalsa();
+        gestion.cuentas.addAll([
+          CuentaResumen(
+            id: 'empleado',
+            empresa: 'Tienda Central',
+            propietario: 'Nombre de trabajador muy largo para comprobar el ancho de pantalla',
+            correo: 'trabajador.con.correo.muy.largo@empresa.com',
+            rol: RolCuenta.encargado,
+            activa: true,
+          ),
+          CuentaResumen(
+            id: 'otra',
+            empresa: 'Otra empresa',
+            propietario: 'Otra propietaria',
+            correo: 'otra@empresa.com',
+            rol: RolCuenta.propietario,
+            activa: false,
+          ),
+        ]);
+        await abrir(tester, gestion);
+        expect(find.text('Tienda Central'), findsOneWidget);
+        await tester.scrollUntilVisible(
+          find.byKey(
+            const ValueKey(
+              'estado-trabajador.con.correo.muy.largo@empresa.com',
+            ),
+          ),
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        expect(find.text(RolCuenta.encargado.etiqueta), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tocar(
+          tester,
+          find.byKey(
+            const ValueKey(
+              'estado-trabajador.con.correo.muy.largo@empresa.com',
+            ),
+          ),
+        );
+        await tester.tap(find.byKey(const ValueKey('confirmar-desactivar')));
+        await tester.pumpAndSettle();
+        expect(
+          gestion.cuentas.firstWhere((c) => c.id == 'empleado').activa,
+          isFalse,
+        );
+        await tester.scrollUntilVisible(
+          find.text('Otra empresa'),
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        expect(find.text('Otra empresa'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
 
     testWidgets('cancelar la desactivación no cambia la cuenta', (
       tester,
@@ -340,6 +450,32 @@ void main() {
       expect(datos.clave, 'clave del administrador');
       expect(correo, 'dueno@empresa.com');
       expect(clave, 'mi frase de acceso 2026');
+      expect(find.byType(CrearAdministradorScreen), findsNothing);
+    });
+
+    testWidgets('en un teléfono sin cuentas no pide autorización', (
+      tester,
+    ) async {
+      final auth = AutenticacionFalsa(requiereAutorizacion: false);
+      await abrir(tester, auth);
+      await abrirFormulario(tester);
+
+      expect(find.text('Autorización del propietario'), findsNothing);
+      expect(find.byKey(const ValueKey('correo-propietario')), findsNothing);
+      for (final (clave, valor) in [
+        ('nombre-admin', 'Laura Gómez'),
+        ('correo-admin', 'admin@finanzasist.com'),
+        ('clave-admin', 'clave del administrador'),
+        ('confirmar-clave-admin', 'clave del administrador'),
+      ]) {
+        await tester.enterText(find.byKey(ValueKey(clave)), valor);
+      }
+      await enviar(tester);
+
+      final (datos, correo, clave) = auth.llamadas.single;
+      expect(datos.correo, 'admin@finanzasist.com');
+      expect(correo, isNull);
+      expect(clave, isNull);
       expect(find.byType(CrearAdministradorScreen), findsNothing);
     });
   });

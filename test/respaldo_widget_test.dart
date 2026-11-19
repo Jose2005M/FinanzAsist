@@ -1,3 +1,6 @@
+@Timeout.factor(4)
+library;
+
 import 'dart:typed_data';
 
 import 'package:finanzasist/data/autenticacion_local.dart';
@@ -14,6 +17,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'soporte_guias.dart';
+import 'soporte_roles.dart';
 
 final _bytes = Uint8List.fromList([1, 2, 3]);
 
@@ -26,7 +30,7 @@ class RespaldoFalso extends RespaldoLocal {
   int exportaciones = 0;
 
   @override
-  Future<bool> restauracionSinSesion() async => sinCuentas;
+  Future<bool> restauracionSinSesion() async => true;
 
   @override
   Future<Uint8List> exportar({SesionEmpresa? sesion}) async {
@@ -41,6 +45,15 @@ class RespaldoFalso extends RespaldoLocal {
     restaurados.add(bytes);
     sinCuentas = false;
   }
+}
+
+/// La pantalla de acceso consulta si se puede crear el administrador; una
+/// consulta real a SQLite dentro del tiempo simulado de la prueba no termina.
+class AutenticacionSinAdministrador extends AutenticacionLocal {
+  AutenticacionSinAdministrador({required super.base});
+
+  @override
+  Future<bool> puedeCrearAdministrador() async => false;
 }
 
 class SelectorFalso implements SelectorArchivos {
@@ -67,12 +80,21 @@ class SelectorFalso implements SelectorArchivos {
 }
 
 void main() {
+  final plantilla = PlantillaRoles();
+  late CasoRoles caso;
+  late SesionEmpresa sesion;
+  setUpAll(() async {
+    await plantilla.crear();
+    caso = await plantilla.copiar();
+    await caso.entrar(RolCuenta.propietario);
+    sesion = caso.accesos.last.sesion!;
+  });
+  tearDownAll(() async {
+    await caso.cerrar();
+    await plantilla.cerrar();
+  });
   late AutenticacionLocal auth;
-  setUp(
-    () => auth = AutenticacionLocal(
-      base: BaseDatosLocal(factory: databaseFactoryFfi),
-    ),
-  );
+  setUp(() => auth = AutenticacionSinAdministrador(base: caso.base));
   tearDown(() => auth.dispose());
 
   Future<void> abrirAcceso(
@@ -100,7 +122,7 @@ void main() {
   }
 
   group('Restaurar desde la pantalla de acceso', () {
-    testWidgets('solo se ofrece si el dispositivo no tiene cuentas', (
+    testWidgets('se ofrece también cuando el dispositivo tiene cuentas', (
       tester,
     ) async {
       final conCuentas = RespaldoFalso(sinCuentas: false);
@@ -108,10 +130,12 @@ void main() {
         tester,
         AccionesRespaldo(respaldo: conCuentas, selector: SelectorFalso()),
       );
-      expect(botonAcceso, findsNothing);
+      expect(botonAcceso, findsOneWidget);
     });
 
-    testWidgets('confirma, restaura y oculta la opción', (tester) async {
+    testWidgets('confirma, agrega la empresa y mantiene la opción', (
+      tester,
+    ) async {
       final respaldo = RespaldoFalso();
       await abrirAcceso(
         tester,
@@ -119,13 +143,21 @@ void main() {
       );
 
       await tocarRestaurarEnAcceso(tester);
-      expect(find.text('¿Reemplazar los datos?'), findsOneWidget);
+      expect(find.text('¿Agregar la empresa del respaldo?'), findsOneWidget);
+      expect(
+        find.textContaining('Se agregará la empresa del respaldo'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Las otras empresas del teléfono no se tocan'),
+        findsOneWidget,
+      );
       await tester.tap(find.byKey(const ValueKey('confirmar-restauracion')));
       await tester.pumpAndSettle();
 
       expect(respaldo.restaurados, [_bytes]);
       expect(find.textContaining('Respaldo restaurado'), findsOneWidget);
-      expect(botonAcceso, findsNothing);
+      expect(botonAcceso, findsOneWidget);
     });
 
     testWidgets('cancelar la confirmación no cambia los datos', (tester) async {
@@ -156,7 +188,7 @@ void main() {
       await tocarRestaurarEnAcceso(tester);
 
       expect(selector.elecciones, 1);
-      expect(find.text('¿Reemplazar los datos?'), findsNothing);
+      expect(find.text('¿Agregar la empresa del respaldo?'), findsNothing);
       expect(respaldo.restaurados, isEmpty);
     });
 
@@ -202,9 +234,12 @@ void main() {
               empresa: 'Tienda Central',
               correo: 'dueno@empresa.com',
               cerrarSesion: () {},
-              exportarRespaldo: () => respaldo.exportar(context),
+              exportarRespaldo: () =>
+                  respaldo.exportar(context, sesion: sesion),
               restaurarRespaldo: () async {
-                if (await respaldo.restaurar(context)) alRestaurar();
+                if (await respaldo.restaurar(context, sesion: sesion)) {
+                  alRestaurar();
+                }
               },
             ),
           ),
@@ -234,7 +269,9 @@ void main() {
       expect(selector.guardados.values.single, _bytes);
       expect(
         selector.guardados.keys.single,
-        matches(RegExp(r'^finanzasist-respaldo-\d{4}-\d{2}-\d{2}-\d{4}\.db$')),
+        matches(
+          RegExp(r'^finanzasist-empresa-de-roles-\d{4}-\d{2}-\d{2}-\d{4}\.db$'),
+        ),
       );
       expect(find.textContaining('Respaldo guardado'), findsOneWidget);
     });
@@ -271,6 +308,12 @@ void main() {
       );
 
       await elegir(tester, 'menu-restaurar-respaldo');
+      expect(find.text('¿Reemplazar los datos de tu empresa?'), findsOneWidget);
+      expect(find.textContaining('cuentas de tu empresa'), findsOneWidget);
+      expect(
+        find.textContaining('Las otras empresas del teléfono no se tocan'),
+        findsOneWidget,
+      );
       await tester.tap(find.byKey(const ValueKey('confirmar-restauracion')));
       await tester.pumpAndSettle();
 

@@ -13,8 +13,8 @@ class RespaldoException implements Exception {
   String toString() => mensaje;
 }
 
-/// Exporta y restaura el archivo SQLite completo de este dispositivo.
-/// Si hay cuentas registradas, ambas acciones exigen una sesión válida.
+/// Exporta y restaura exclusivamente los datos de una empresa.
+/// Desde el acceso solo agrega empresas que todavía no estén en el teléfono.
 class RespaldoLocal {
   RespaldoLocal({
     required this.base,
@@ -87,49 +87,224 @@ class RespaldoLocal {
   final BaseDatosLocal base;
   final int tamanoMaximo;
 
-  static String nombreArchivo(DateTime fecha) {
+  static String nombreArchivo(String empresa, DateTime fecha) {
+    var nombre = empresa.toLowerCase();
+    const acentos = 'áàäâéèëêíìïîóòöôúùüûñ';
+    const simples = 'aaaaeeeeiiiioooouuuun';
+    for (var i = 0; i < acentos.length; i++) {
+      nombre = nombre.replaceAll(acentos[i], simples[i]);
+    }
+    nombre = nombre
+        .replaceAll(RegExp(r'[\u0300-\u036f]'), '')
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '-');
+    if (nombre.length > 40) nombre = nombre.substring(0, 40);
+    nombre = nombre.replaceAll(RegExp(r'^-+|-+$'), '');
+    if (nombre.isEmpty) nombre = 'empresa';
     String dos(int n) => n.toString().padLeft(2, '0');
-    return 'finanzasist-respaldo-${fecha.year}-${dos(fecha.month)}-'
+    return 'finanzasist-$nombre-${fecha.year}-${dos(fecha.month)}-'
         '${dos(fecha.day)}-${dos(fecha.hour)}${dos(fecha.minute)}.db';
   }
 
-  /// En un dispositivo sin cuentas se puede restaurar desde la pantalla de
-  /// acceso; con cuentas, solo el propietario con sesión iniciada.
-  Future<bool> restauracionSinSesion() async =>
-      !await _hayCuentas(await base.abrir);
+  Future<bool> restauracionSinSesion() async {
+    await base.abrir;
+    return true;
+  }
 
-  Future<Uint8List> exportar({SesionEmpresa? sesion}) async {
-    await _autorizar(sesion);
-    try {
-      return await base.leerArchivo();
-    } on FileSystemException {
-      throw const RespaldoException(
-        'No pudimos leer los datos para exportarlos. Inténtalo de nuevo.',
+  // Orden de inserción según las claves foráneas del esquema vigente.
+  static const _tablas = [
+    'empresas',
+    'usuarios',
+    'cuentas',
+    'productos',
+    'operaciones',
+    'movimientos',
+    'gastos',
+    'guias_vistas',
+  ];
+
+  Future<Directory> _temporal() async {
+    final carpeta = File(await base.ubicacion).parent;
+    await carpeta.create(recursive: true);
+    // createTemp crea la carpeta DENTRO de `carpeta`, con este prefijo.
+    return carpeta.createTemp('finanzasist-respaldo-');
+  }
+
+  Future<Map<String, List<Map<String, Object?>>>> _leerEmpresa(
+    DatabaseExecutor db,
+    String empresa,
+  ) async {
+    final filas = <String, List<Map<String, Object?>>>{};
+    for (final tabla in _tablas) {
+      filas[tabla] = await db.query(
+        tabla,
+        where: tabla == 'empresas'
+            ? 'id = ?'
+            : tabla == 'guias_vistas'
+            ? 'cuenta IN (SELECT id FROM cuentas WHERE empresa = ? AND rol <> \'administrador\')'
+            : tabla == 'cuentas'
+            ? "empresa = ? AND rol <> 'administrador'"
+            : 'empresa = ?',
+        whereArgs: [empresa],
       );
+    }
+    return filas;
+  }
+
+  Future<void> _insertar(
+    DatabaseExecutor db,
+    Map<String, List<Map<String, Object?>>> filas, {
+    bool conservarEmpresa = false,
+  }) async {
+    for (final tabla in _tablas) {
+      if (conservarEmpresa && tabla == 'empresas') continue;
+      for (final fila in filas[tabla]!) {
+        await db.insert(tabla, fila);
+      }
     }
   }
 
-  /// Reemplaza todos los datos del dispositivo por los del respaldo.
-  /// Si el archivo no es válido, los datos actuales quedan intactos.
-  Future<void> restaurar(Uint8List bytes, {SesionEmpresa? sesion}) async {
-    _verificarArchivo(bytes);
-    await _autorizar(sesion);
-    final candidato = '${await base.ubicacion}.restaurando';
+  Future<Uint8List> exportar({SesionEmpresa? sesion}) async {
+    final db = await base.abrir;
+    final filas = await db.transaction((tx) async {
+      await _autorizar(tx, sesion);
+      return _leerEmpresa(tx, sesion!.empresaId);
+    });
+    Directory? temporal;
+    BaseDatosLocal? copia;
     try {
-      await File(candidato).writeAsBytes(bytes, flush: true);
-      await _validar(candidato);
-      await base.reemplazarArchivo(candidato);
+      temporal = await _temporal();
+      copia = BaseDatosLocal(
+        factory: base.factory,
+        ruta: '${temporal.path}/empresa.db',
+      );
+      await (await copia.abrir).transaction((tx) => _insertar(tx, filas));
+      return await copia.leerArchivo();
     } on DatabaseException {
       throw const RespaldoException(_danado);
     } on FileSystemException {
       throw const RespaldoException(
-        'No pudimos guardar el respaldo en el dispositivo. '
-        'Revisa el espacio disponible e inténtalo de nuevo.',
+        'No pudimos leer los datos para exportarlos. Inténtalo de nuevo.',
       );
     } finally {
-      final archivo = File(candidato);
-      if (await archivo.exists()) await archivo.delete();
-      await BaseDatosLocal.borrarAuxiliares(candidato);
+      try {
+        await copia?.cerrar();
+      } finally {
+        if (temporal != null) await temporal.delete(recursive: true);
+      }
+    }
+  }
+
+  Future<void> restaurar(Uint8List bytes, {SesionEmpresa? sesion}) async {
+    _verificarArchivo(bytes);
+    final destino = await base.abrir;
+    if (sesion != null) {
+      await destino.transaction((tx) => _autorizar(tx, sesion));
+    }
+    Directory? temporal;
+    BaseDatosLocal? copia;
+    try {
+      temporal = await _temporal();
+      final ruta = '${temporal.path}/empresa.db';
+      await File(ruta).writeAsBytes(bytes, flush: true);
+      await _validar(ruta);
+      copia = BaseDatosLocal(factory: base.factory, ruta: ruta);
+      final origen = await copia.abrir;
+      final empresas = await origen.rawQuery('''
+        SELECT e.id FROM empresas e
+        WHERE NOT EXISTS (SELECT 1 FROM cuentas c
+          WHERE c.empresa = e.id AND c.rol = 'administrador')
+        AND (EXISTS (SELECT 1 FROM usuarios u WHERE u.empresa = e.id)
+          OR EXISTS (SELECT 1 FROM productos p WHERE p.empresa = e.id))
+      ''');
+      if (empresas.length > 1) {
+        throw const RespaldoException(
+          'El respaldo contiene varias empresas. Usa un respaldo de una sola empresa.',
+        );
+      }
+      if (empresas.isEmpty) throw const RespaldoException(_noEsRespaldo);
+      final empresa = empresas.single['id'];
+      if (empresa is! String) throw const RespaldoException(_noEsRespaldo);
+      final filas = await _leerEmpresa(origen, empresa);
+      final tienePropietario = filas['cuentas']!.any(
+        (c) => c['rol'] == 'propietario',
+      );
+      // Todo el trabajo de archivo termina antes de modificar el teléfono.
+      await copia.cerrar();
+      copia = null;
+      await temporal.delete(recursive: true);
+      temporal = null;
+      await destino.transaction((tx) async {
+        if (sesion != null) {
+          await _autorizar(tx, sesion);
+          if (sesion.empresaId != empresa) {
+            throw const RespaldoException('Este respaldo es de otra empresa');
+          }
+        }
+        if (!tienePropietario && (sesion != null || await _hayCuentas(tx))) {
+          throw const RespaldoException(
+            'Este respaldo antiguo sin propietario solo se puede restaurar en un teléfono sin cuentas.',
+          );
+        }
+        final existe = (await tx.query(
+          'empresas',
+          where: 'id = ?',
+          whereArgs: [empresa],
+        )).isNotEmpty;
+        if (sesion == null && existe) {
+          throw const RespaldoException(
+            'Esta empresa ya está en el teléfono. Inicia sesión como su propietario para restaurarla',
+          );
+        }
+        // Comprueba también ids globales: nunca reemplazar cuentas ajenas.
+        for (final cuenta in filas['cuentas']!) {
+          final choque = await tx.query(
+            'cuentas',
+            columns: ['id'],
+            where: '(empresa <> ? OR rol = ?) AND (correo = ? COLLATE NOCASE OR id = ?)',
+            whereArgs: [
+              empresa,
+              'administrador',
+              cuenta['correo'],
+              cuenta['id'],
+            ],
+          );
+          if (choque.isNotEmpty) {
+            throw const RespaldoException(
+              'Un correo o identificador del respaldo ya pertenece a otra cuenta del teléfono.',
+            );
+          }
+        }
+        if (sesion != null) {
+          await tx.delete(
+            'guias_vistas',
+            where: 'cuenta IN (SELECT id FROM cuentas WHERE empresa = ?)',
+            whereArgs: [empresa],
+          );
+          for (final tabla in [
+            'movimientos',
+            'operaciones',
+            'gastos',
+            'productos',
+            'cuentas',
+            'usuarios',
+          ]) {
+            await tx.delete(tabla, where: 'empresa = ?', whereArgs: [empresa]);
+          }
+        }
+        await _insertar(tx, filas, conservarEmpresa: existe);
+      });
+    } on DatabaseException {
+      throw const RespaldoException(_danado);
+    } on FileSystemException {
+      throw const RespaldoException(
+        'No pudimos guardar el respaldo en el dispositivo. Revisa el espacio disponible e inténtalo de nuevo.',
+      );
+    } finally {
+      try {
+        await copia?.cerrar();
+      } finally {
+        if (temporal != null) await temporal.delete(recursive: true);
+      }
     }
   }
 
@@ -151,34 +326,25 @@ class RespaldoLocal {
     }
   }
 
-  Future<bool> _hayCuentas(DatabaseExecutor db) async =>
-      (await db.query('cuentas', columns: ['id'], limit: 1)).isNotEmpty;
+  /// Cuentas de algún negocio; el administrador del dispositivo no cuenta.
+  Future<bool> _hayCuentas(DatabaseExecutor db) async => (await db.query(
+    'cuentas',
+    columns: ['id'],
+    where: 'rol <> ?',
+    whereArgs: [RolCuenta.administrador.name],
+    limit: 1,
+  )).isNotEmpty;
 
-  Future<void> _autorizar(SesionEmpresa? sesion) async {
-    final db = await base.abrir;
-    if (!await _hayCuentas(db)) return;
+  Future<void> _autorizar(DatabaseExecutor db, SesionEmpresa? sesion) async {
     if (sesion == null) {
-      throw const RespaldoException('Inicia sesión para usar los respaldos.');
+      throw const RespaldoException(
+        'Inicia sesión como propietario para usar los respaldos.',
+      );
     }
     try {
-      await sesion.verificar(db);
+      await sesion.verificar(db, permiso: Permiso.gestionarRespaldos);
     } on AccesoException catch (error) {
       throw RespaldoException(error.mensaje);
-    }
-    // El respaldo copia la base entera: con varias empresas expondría o
-    // borraría los datos de las demás.
-    final cuentas =
-        Sqflite.firstIntValue(
-          await db.rawQuery('SELECT COUNT(*) FROM cuentas WHERE rol = ?', [
-            RolCuenta.propietario.name,
-          ]),
-        ) ??
-        0;
-    if (cuentas > 1) {
-      throw const RespaldoException(
-        'Este dispositivo tiene varias empresas. Los respaldos solo están '
-        'disponibles cuando hay una sola cuenta.',
-      );
     }
   }
 
@@ -198,6 +364,21 @@ class RespaldoLocal {
         );
       }
       if (version < 1) throw const RespaldoException(_noEsRespaldo);
+      final tablas = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+      );
+      if (tablas.any(
+        (t) =>
+            !_esquema.containsKey(t['name']) && t['name'] != 'android_metadata',
+      )) {
+        throw const RespaldoException(_noEsRespaldo);
+      }
+      // Nunca ejecutar disparadores provenientes de un archivo externo al migrarlo.
+      if ((await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type IN ('trigger', 'view')",
+      )).isNotEmpty) {
+        throw const RespaldoException(_noEsRespaldo);
+      }
       for (final MapEntry(key: tabla, value: (desde, columnas))
           in _esquema.entries) {
         if (version < desde) continue;
@@ -209,7 +390,8 @@ class RespaldoLocal {
         ];
         final info = await db.rawQuery('PRAGMA table_info("$tabla")');
         final existentes = info.map((columna) => columna['name']).toSet();
-        if (!existentes.containsAll(esperadas)) {
+        if (existentes.length != esperadas.length ||
+            !existentes.containsAll(esperadas)) {
           throw const RespaldoException(_noEsRespaldo);
         }
       }

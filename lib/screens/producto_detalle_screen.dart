@@ -6,6 +6,8 @@ import '../widgets/contexto_negocio.dart';
 import '../data/producto_repository.dart';
 import '../data/negocio_repository.dart';
 import '../models/operacion.dart';
+import '../models/permisos.dart';
+import '../widgets/permisos_sesion.dart';
 import '../models/producto.dart';
 import '../utils/formato_moneda.dart';
 import '../utils/formato_operacion.dart';
@@ -176,10 +178,11 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                           etiqueta: 'Existencias disponibles',
                           valor: '${producto.cantidad} unidades',
                         ),
-                        _Dato(
-                          etiqueta: 'Costo de compra por unidad',
-                          valor: formatearPesos(producto.costoCompra),
-                        ),
+                        if (PermisosSesion.permite(context, Permiso.verCostos))
+                          _Dato(
+                            etiqueta: 'Costo de compra por unidad',
+                            valor: formatearPesos(producto.costoCompra),
+                          ),
                         _Dato(
                           etiqueta: 'Precio de venta por unidad',
                           valor: formatearPesos(producto.precioVenta),
@@ -188,15 +191,23 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  FilledButton.icon(
-                    key: const ValueKey('editar-producto'),
-                    onPressed: () => _editarProducto(producto),
-                    icon: const Icon(Icons.edit_outlined),
-                    label: const Text('Editar producto'),
-                  ),
+                  if (PermisosSesion.permite(
+                    context,
+                    Permiso.gestionarProductos,
+                  ))
+                    FilledButton.icon(
+                      key: const ValueKey('editar-producto'),
+                      onPressed: () => _editarProducto(producto),
+                      icon: const Icon(Icons.edit_outlined),
+                      label: const Text('Editar producto'),
+                    ),
                   if (widget.repositorio is NegocioRepository) ...[
                     const SizedBox(height: 12),
-                    if (producto.cantidad == 0 &&
+                    if (PermisosSesion.permite(
+                          context,
+                          Permiso.gestionarExistencias,
+                        ) &&
+                        producto.cantidad == 0 &&
                         _viewModel.movimientos.isEmpty) ...[
                       OutlinedButton.icon(
                         key: const ValueKey('existencias-iniciales'),
@@ -206,12 +217,16 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                       ),
                       const SizedBox(height: 12),
                     ],
-                    OutlinedButton.icon(
-                      key: const ValueKey('ajustar-inventario'),
-                      onPressed: () => _movimiento(TipoOperacion.ajuste),
-                      icon: const Icon(Icons.tune),
-                      label: const Text('Ajustar existencias'),
-                    ),
+                    if (PermisosSesion.permite(
+                      context,
+                      Permiso.gestionarExistencias,
+                    ))
+                      OutlinedButton.icon(
+                        key: const ValueKey('ajustar-inventario'),
+                        onPressed: () => _movimiento(TipoOperacion.ajuste),
+                        icon: const Icon(Icons.tune),
+                        label: const Text('Ajustar existencias'),
+                      ),
                     const SizedBox(height: 24),
                     Text(
                       'Movimientos de inventario',

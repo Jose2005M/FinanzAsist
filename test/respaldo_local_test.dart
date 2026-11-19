@@ -29,12 +29,27 @@ void main() {
   late AutenticacionLocal auth;
   late RespaldoLocal respaldo;
 
+  late Directory plantillas;
+  setUpAll(() async {
+    plantillas = await Directory.systemTemp.createTemp('respaldo-plantilla-');
+    final b = BaseDatosLocal(
+      factory: databaseFactoryFfi,
+      ruta: '${plantillas.path}/base.db',
+    );
+    final a = AutenticacionLocal(base: b);
+    await a.registrar(registro);
+    a.dispose();
+    await b.cerrar();
+  });
+  tearDownAll(() => plantillas.delete(recursive: true));
+
   setUp(() async {
     directorio = await Directory.systemTemp.createTemp('finanzasist-respaldo-');
     base = BaseDatosLocal(
       factory: databaseFactoryFfi,
       ruta: '${directorio.path}/finanzasist.db',
     );
+    await File('${plantillas.path}/base.db').copy(base.ruta!);
     auth = AutenticacionLocal(base: base);
     respaldo = RespaldoLocal(base: base);
   });
@@ -71,7 +86,7 @@ void main() {
 
   group('Exportar', () {
     test('produce una base SQLite con los datos del negocio', () async {
-      await auth.registrar(registro);
+      await auth.iniciarSesion(registro.correo, clave);
       await crearProducto('Arroz de 1 kg');
 
       final bytes = await respaldo.exportar(sesion: auth.sesion);
@@ -86,7 +101,7 @@ void main() {
     });
 
     test('exige una sesión válida cuando hay cuentas', () async {
-      await auth.registrar(registro);
+      await auth.iniciarSesion(registro.correo, clave);
       await expectLater(respaldo.exportar(), throwsA(isA<RespaldoException>()));
       final sesion = auth.sesion!;
       auth.cerrarSesion();
@@ -96,63 +111,48 @@ void main() {
       );
     });
 
-    test('no se permite con varias empresas en el dispositivo', () async {
-      await auth.registrar(registro);
-      auth.cerrarSesion();
-      await auth.registrar(
-        const DatosRegistro(
-          empresa: 'Otra Tienda',
-          propietario: 'Ana Ruiz',
-          correo: 'ana@otra.com',
-          clave: clave,
-        ),
-      );
-      await crearProducto('Producto de Otra Tienda');
-
-      await expectLater(
-        respaldo.exportar(sesion: auth.sesion),
-        throwsA(
-          isA<RespaldoException>().having(
-            (e) => e.mensaje,
-            'mensaje',
-            contains('varias empresas'),
-          ),
-        ),
-      );
-      await expectLater(
-        respaldo.restaurar(
-          Uint8List.fromList(utf8.encode('SQLite format 3\u0000 resto')),
-          sesion: auth.sesion,
-        ),
-        throwsA(
-          isA<RespaldoException>().having(
-            (e) => e.mensaje,
-            'mensaje',
-            contains('varias empresas'),
-          ),
-        ),
-      );
-      expect(await nombresProductos(), ['Producto de Otra Tienda']);
-    });
-
     test('la base sigue disponible después de exportar', () async {
-      await auth.registrar(registro);
+      await auth.iniciarSesion(registro.correo, clave);
       await respaldo.exportar(sesion: auth.sesion);
       await crearProducto('Aceite de 1 litro');
       expect(await nombresProductos(), ['Aceite de 1 litro']);
     });
 
+    test(
+      'nombre vacío, símbolos, acento combinado y límite de 40 caracteres',
+      () {
+        final fecha = DateTime(2026, 11, 8, 7, 5);
+        for (final nombre in ['', '  !!!  ', '中文']) {
+          expect(
+            RespaldoLocal.nombreArchivo(nombre, fecha),
+            'finanzasist-empresa-2026-11-08-0705.db',
+          );
+        }
+        expect(
+          RespaldoLocal.nombreArchivo('Cafe\u0301', fecha),
+          'finanzasist-cafe-2026-11-08-0705.db',
+        );
+        expect(
+          RespaldoLocal.nombreArchivo('a' * 80, fecha),
+          'finanzasist-${'a' * 40}-2026-11-08-0705.db',
+        );
+      },
+    );
+
     test('nombre de archivo con fecha y hora local', () {
       expect(
-        RespaldoLocal.nombreArchivo(DateTime(2026, 11, 8, 7, 5)),
-        'finanzasist-respaldo-2026-11-08-0705.db',
+        RespaldoLocal.nombreArchivo(
+          ' Café ÁÉÍÓÚ Ñ & Central! ',
+          DateTime(2026, 11, 8, 7, 5),
+        ),
+        'finanzasist-cafe-aeiou-n-central-2026-11-08-0705.db',
       );
     });
   });
 
   group('Restaurar', () {
     test('reemplaza los datos y conserva las cuentas del respaldo', () async {
-      await auth.registrar(registro);
+      await auth.iniciarSesion(registro.correo, clave);
       await crearProducto('Arroz de 1 kg');
       final bytes = await respaldo.exportar(sesion: auth.sesion);
       await crearProducto('Aceite de 1 litro');
@@ -163,12 +163,12 @@ void main() {
 
       expect(await nombresProductos(), ['Arroz de 1 kg']);
       final archivos = directorio.listSync().map((e) => e.path).toList();
-      expect(archivos.where((p) => p.contains('.restaurando')), isEmpty);
+      expect(archivos.where((p) => p.contains('.respaldo-')), isEmpty);
       expect(archivos.where((p) => p.contains('.anterior')), isEmpty);
     });
 
     test('sin cuentas en el dispositivo se permite sin sesión', () async {
-      await auth.registrar(registro);
+      await auth.iniciarSesion(registro.correo, clave);
       await crearProducto('Arroz de 1 kg');
       final bytes = await respaldo.exportar(sesion: auth.sesion);
       auth.dispose();
@@ -181,13 +181,13 @@ void main() {
       expect(await respaldo.restauracionSinSesion(), isTrue);
       await respaldo.restaurar(bytes);
 
-      expect(await respaldo.restauracionSinSesion(), isFalse);
+      expect(await respaldo.restauracionSinSesion(), isTrue);
       await auth.iniciarSesion(registro.correo, clave);
       expect(await nombresProductos(), ['Arroz de 1 kg']);
     });
 
-    test('con cuentas en el dispositivo exige sesión', () async {
-      await auth.registrar(registro);
+    test('con la empresa ya presente exige sesión de su propietario', () async {
+      await auth.iniciarSesion(registro.correo, clave);
       await crearProducto('Arroz de 1 kg');
       final bytes = await respaldo.exportar(sesion: auth.sesion);
       await crearProducto('Aceite de 1 litro');
@@ -201,6 +201,8 @@ void main() {
 
     test('migra un respaldo de una versión anterior', () async {
       // Datos del negocio local anterior a las cuentas (esquema v2).
+      await base.cerrar();
+      await File(base.ruta!).delete();
       final anterior = RepositorioSqlite(
         factory: databaseFactoryFfi,
         ruta: base.ruta,
@@ -211,17 +213,23 @@ void main() {
         precioVenta: 4000,
       );
       await anterior.cerrar();
-      final v2 = await alterarCopia(await respaldo.exportar(), (db) async {
+      final v2 = await alterarCopia(await base.leerArchivo(), (db) async {
         await db.execute('DROP TABLE guias_vistas');
         await db.execute('DROP TABLE cuentas');
         await db.execute('PRAGMA user_version = 2');
       });
-      await auth.registrar(registro);
-      await crearProducto('Producto nuevo');
-
-      await respaldo.restaurar(v2, sesion: auth.sesion);
-      auth.cerrarSesion();
-
+      await base.cerrar();
+      await File(base.ruta!).delete();
+      await File('${plantillas.path}/base.db').copy(base.ruta!);
+      final cuentasAntes = await (await base.abrir).query('cuentas');
+      await expectLater(
+        respaldo.restaurar(v2),
+        throwsA(isA<RespaldoException>()),
+      );
+      expect(await (await base.abrir).query('cuentas'), cuentasAntes);
+      await base.cerrar();
+      await File(base.ruta!).delete();
+      await respaldo.restaurar(v2);
       expect(await (await base.abrir).getVersion(), BaseDatosLocal.version);
       // La primera cuenta registrada adopta el negocio anterior del respaldo.
       await auth.registrar(registro);
@@ -231,7 +239,7 @@ void main() {
     group('rechaza y conserva los datos actuales', () {
       late Uint8List valido;
       setUp(() async {
-        await auth.registrar(registro);
+        await auth.iniciarSesion(registro.correo, clave);
         await crearProducto('Arroz de 1 kg');
         valido = await respaldo.exportar(sesion: auth.sesion);
         await crearProducto('Aceite de 1 litro');
@@ -253,7 +261,7 @@ void main() {
           'Aceite de 1 litro',
         ]);
         final archivos = directorio.listSync().map((e) => e.path);
-        expect(archivos.where((p) => p.contains('.restaurando')), isEmpty);
+        expect(archivos.where((p) => p.contains('.respaldo-')), isEmpty);
       }
 
       test('un archivo vacío', () async {
@@ -291,6 +299,23 @@ void main() {
           await db.execute('CREATE TABLE gastos (id TEXT)');
         });
         await rechaza(distinta, contains('no es un respaldo de FinanzAsist'));
+      });
+
+      test('tablas y columnas adicionales ajenas', () async {
+        await rechaza(
+          await alterarCopia(
+            valido,
+            (db) => db.execute('CREATE TABLE notas (texto TEXT)'),
+          ),
+          contains('no es un respaldo'),
+        );
+        await rechaza(
+          await alterarCopia(
+            valido,
+            (db) => db.execute('ALTER TABLE productos ADD COLUMN ajena TEXT'),
+          ),
+          contains('no es un respaldo'),
+        );
       });
 
       test('un respaldo de una versión más nueva', () async {

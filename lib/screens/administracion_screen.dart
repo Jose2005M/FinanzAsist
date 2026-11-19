@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../data/administracion_local.dart';
+import '../data/administracion_dispositivo.dart';
 import '../data/autenticacion_local.dart';
 import '../theme/tema_finanzasist.dart';
 import '../viewmodels/administracion_view_model.dart';
@@ -11,10 +11,12 @@ class AdministracionScreen extends StatefulWidget {
   const AdministracionScreen({
     super.key,
     required this.administracion,
+    required this.administrador,
     required this.cerrarSesion,
   });
 
-  final GestionCuentas administracion;
+  final GestionDispositivo administracion;
+  final CuentaResumen administrador;
   final VoidCallback cerrarSesion;
 
   @override
@@ -94,7 +96,7 @@ class _AdministracionScreenState extends State<AdministracionScreen> {
   }
 
   Widget? _estado() {
-    if (_vm.cargando && _vm.cuentas.isEmpty) {
+    if (_vm.cargando && _vm.empresas.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
     if (_vm.error case final error?) {
@@ -132,7 +134,7 @@ class _AdministracionScreenState extends State<AdministracionScreen> {
             cabecera: const Padding(
               padding: EdgeInsets.all(20),
               child: CabeceraModulo(
-                titulo: 'Usuarios registrados',
+                titulo: 'Usuarios del dispositivo',
                 descripcion:
                     'Cuentas de este dispositivo. Puedes desactivarlas o '
                     'restablecer su contraseña; no ves los datos de sus '
@@ -141,14 +143,44 @@ class _AdministracionScreenState extends State<AdministracionScreen> {
               ),
             ),
             estado: _estado(),
-            cantidad: _vm.cuentas.length,
+            cantidad: _vm.empresas.length + 1,
             onActualizar: _vm.cargar,
-            itemBuilder: (context, i) => _TarjetaCuenta(
-              cuenta: _vm.cuentas[i],
-              ocupada: _vm.procesando != null,
-              cambiarEstado: _cambiarEstado,
-              restablecerClave: _restablecerClave,
-            ),
+            itemBuilder: (context, i) {
+              if (i == 0) {
+                return _TarjetaCuenta(
+                  cuenta: widget.administrador,
+                  ocupada: true,
+                  cambiarEstado: _cambiarEstado,
+                  restablecerClave: _restablecerClave,
+                );
+              }
+              final empresa = _vm.empresas[i - 1];
+              return Column(
+                key: ValueKey(empresa.id),
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text(
+                      empresa.nombre,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                  for (final cuenta in empresa.cuentas)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _TarjetaCuenta(
+                        cuenta: cuenta,
+                        ocupada: _vm.procesando != null || _vm.cargando,
+                        cambiarEstado: _cambiarEstado,
+                        restablecerClave: _restablecerClave,
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
         ),
       ),
@@ -182,17 +214,27 @@ class _TarjetaCuenta extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  esAdministrador ? 'Administrador (tú)' : cuenta.empresa,
+                  esAdministrador ? 'Administrador (tú)' : cuenta.propietario,
                   style: texto.titleMedium,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               _Estado(activa: cuenta.activa),
             ],
           ),
           const SizedBox(height: 4),
-          Text(cuenta.propietario),
+          if (esAdministrador)
+            Text(
+              cuenta.propietario,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          Text(cuenta.rol.etiqueta),
           Text(
             cuenta.correo,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: texto.bodyMedium?.copyWith(
               color: ColoresFinanzAsist.secundaria,
             ),
@@ -282,6 +324,7 @@ class _DialogoNuevaClaveState extends State<_DialogoNuevaClave> {
   @override
   Widget build(BuildContext context) => AlertDialog(
     title: const Text('Restablecer contraseña'),
+    scrollable: true,
     content: Form(
       key: _formulario,
       child: Column(

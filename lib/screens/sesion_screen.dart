@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 
 import '../data/autenticacion_local.dart';
+import '../data/administracion_dispositivo.dart';
+import 'administracion_screen.dart';
 import '../data/repositorio_sqlite.dart';
-import '../data/administracion_local.dart';
+import '../data/usuarios_empresa.dart';
+import '../widgets/permisos_sesion.dart';
 import '../data/almacen_guias.dart';
 import '../widgets/acciones_respaldo.dart';
 import '../widgets/guia_modulo.dart';
 import 'acceso_screen.dart';
-import 'administracion_screen.dart';
+import 'usuarios_empresa_screen.dart';
 import 'negocio_screen.dart';
 
 /// Reemplaza todo el navegador privado al cerrar o cambiar de sesión.
@@ -30,10 +33,11 @@ class SesionScreen extends StatelessWidget {
       if (sesion.esAdministrador) {
         return AdministracionScreen(
           key: ValueKey(sesion),
-          administracion: AdministracionLocal(
+          administracion: AdministracionDispositivo(
             base: autenticacion.base,
             sesion: sesion,
           ),
+          administrador: CuentaResumen.deSesion(sesion),
           cerrarSesion: autenticacion.cerrarSesion,
         );
       }
@@ -84,20 +88,33 @@ class _AreaEmpresaState extends State<_AreaEmpresa> {
   }
 
   @override
-  Widget build(BuildContext context) => AreaGuias(
-    almacen: _guias,
-    child: NavigatorPopHandler<void>(
-      onPopWithResult: (_) => _navegador.currentState!.maybePop(),
-      child: Navigator(
-        key: _navegador,
-        onGenerateRoute: (_) => MaterialPageRoute<void>(
-          builder: (_) => NegocioScreen(
-            repositorio: _repositorio,
-            empresa: widget.sesion.empresa,
-            correo: widget.sesion.correo,
-            cerrarSesion: widget.autenticacion.cerrarSesion,
-            exportarRespaldo: widget.respaldo == null ? null : _exportar,
-            restaurarRespaldo: widget.respaldo == null ? null : _restaurar,
+  Widget build(BuildContext context) => PermisosSesion(
+    rol: widget.sesion.rol,
+    child: AreaGuias(
+      almacen: _guias,
+      child: NavigatorPopHandler<void>(
+        onPopWithResult: (_) => _navegador.currentState!.maybePop(),
+        child: Navigator(
+          key: _navegador,
+          onGenerateRoute: (_) => MaterialPageRoute<void>(
+            builder: (_) => NegocioScreen(
+              repositorio: _repositorio,
+              empresa: widget.sesion.empresa,
+              correo: widget.sesion.correo,
+              cerrarSesion: widget.autenticacion.cerrarSesion,
+              gestionarUsuarios: () => _navegador.currentState!.push<void>(
+                MaterialPageRoute(
+                  builder: (_) => UsuariosEmpresaScreen(
+                    usuarios: UsuariosEmpresa(
+                      base: widget.autenticacion.base,
+                      sesion: widget.sesion,
+                    ),
+                  ),
+                ),
+              ),
+              exportarRespaldo: widget.respaldo == null ? null : _exportar,
+              restaurarRespaldo: widget.respaldo == null ? null : _restaurar,
+            ),
           ),
         ),
       ),
