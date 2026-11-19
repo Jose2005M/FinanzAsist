@@ -20,7 +20,7 @@ class MarcaFinanzAsist extends StatelessWidget {
           compacta ? 48 : (reducida ? 92 : 108),
           compacta ? 40 : (reducida ? 66 : 78),
         ),
-        painter: const _SimboloFinanzAsist(),
+        painter: const SimboloFinanzAsist(),
       ),
     );
     final nombre = Text(
@@ -48,8 +48,10 @@ class MarcaFinanzAsist extends StatelessWidget {
   }
 }
 
-class _SimboloFinanzAsist extends CustomPainter {
-  const _SimboloFinanzAsist();
+/// Símbolo de la marca (barras y flecha) en un lienzo de proporción 120 × 90.
+/// También genera el ícono de la app: ver tool/generar_icono_test.dart.
+class SimboloFinanzAsist extends CustomPainter {
+  const SimboloFinanzAsist();
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -95,5 +97,5 @@ class _SimboloFinanzAsist extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _SimboloFinanzAsist oldDelegate) => false;
+  bool shouldRepaint(covariant SimboloFinanzAsist oldDelegate) => false;
 }

@@ -158,13 +158,61 @@ void main() {
           .toList();
 
   group('Crear administrador', () {
-    test('no se ofrece en un dispositivo sin cuentas', () async {
-      expect(await auth.puedeCrearAdministrador(), isFalse);
-      await expectLater(
-        crearAdministrador(),
-        accesoCon('Correo o contraseña del propietario incorrectos'),
-      );
-    });
+    test(
+      'en un teléfono sin cuentas lo crea el primero, sin autorización',
+      () async {
+        expect(await auth.puedeCrearAdministrador(), isTrue);
+        expect(await auth.administradorRequiereAutorizacion(), isFalse);
+
+        await auth.crearAdministrador(administrador);
+
+        expect(auth.sesion!.esAdministrador, isTrue);
+        expect(await auth.puedeCrearAdministrador(), isFalse);
+      },
+    );
+
+    test(
+      'con cuentas en el teléfono exige la autorización de un propietario',
+      () async {
+        await registrarPropietarios();
+        expect(await auth.administradorRequiereAutorizacion(), isTrue);
+
+        await expectLater(
+          auth.crearAdministrador(administrador),
+          accesoCon('Correo o contraseña del propietario incorrectos'),
+        );
+        expect(auth.sesion, isNull);
+        expect(await auth.puedeCrearAdministrador(), isTrue);
+      },
+    );
+
+    test(
+      'el primer propietario tras el administrador adopta los datos anteriores',
+      () async {
+        // Datos locales de una versión anterior a las cuentas.
+        final anterior = RepositorioSqlite(
+          factory: databaseFactoryFfi,
+          ruta: base.ruta,
+        );
+        await anterior.crearProducto(
+          nombre: 'Arroz anterior',
+          costoCompra: 3000,
+          precioVenta: 4000,
+        );
+        await anterior.cerrar();
+        await auth.crearAdministrador(administrador);
+        auth.cerrarSesion();
+
+        await auth.registrar(propietario);
+
+        expect(auth.sesion!.empresaId, 'negocio-local');
+        final productos = await RepositorioSqlite.conSesion(
+          base: base,
+          sesion: auth.sesion!,
+        ).obtenerTodos();
+        expect(productos.single.nombre, 'Arroz anterior');
+      },
+    );
 
     test('con la autorización de un propietario inicia su sesión', () async {
       await registrarPropietarios();

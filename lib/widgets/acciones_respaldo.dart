@@ -23,13 +23,16 @@ class AccionesRespaldo {
     try {
       final bytes = await respaldo.exportar(sesion: sesion);
       final guardado = await selector.guardar(
-        nombre: RespaldoLocal.nombreArchivo(DateTime.now()),
+        nombre: RespaldoLocal.nombreArchivo(
+          sesion?.empresa ?? 'empresa',
+          DateTime.now(),
+        ),
         bytes: bytes,
       );
       if (guardado) {
         _avisar(
           mensajes,
-          'Respaldo guardado. Contiene todos los datos del negocio: '
+          'Respaldo guardado. Contiene los datos y las cuentas de tu empresa: '
           'consérvalo en un lugar seguro.',
         );
       }
@@ -42,7 +45,7 @@ class AccionesRespaldo {
     }
   }
 
-  /// Devuelve `true` si los datos del dispositivo se reemplazaron.
+  /// Devuelve `true` si se restauró la empresa.
   Future<bool> restaurar(BuildContext context, {SesionEmpresa? sesion}) async {
     if (_ocupado) return false;
     _ocupado = true;
@@ -50,7 +53,7 @@ class AccionesRespaldo {
     try {
       final bytes = await selector.elegir(tamanoMaximo: respaldo.tamanoMaximo);
       if (bytes == null || !context.mounted) return false;
-      if (!await _confirmar(context)) return false;
+      if (!await _confirmar(context, conSesion: sesion != null)) return false;
       await respaldo.restaurar(bytes, sesion: sesion);
       _avisar(
         mensajes,
@@ -67,18 +70,27 @@ class AccionesRespaldo {
     return false;
   }
 
-  Future<bool> _confirmar(BuildContext context) async =>
+  Future<bool> _confirmar(
+    BuildContext context, {
+    required bool conSesion,
+  }) async =>
       await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('¿Reemplazar los datos?'),
-          content: const Text(
-            'Las cuentas, productos, compras, ventas y gastos de este '
-            'dispositivo se reemplazarán por los del respaldo. '
-            'No se puede deshacer.\n\n'
-            'Si quieres conservar los datos actuales, exporta un respaldo '
-            'antes. Después deberás iniciar sesión con una cuenta del '
-            'respaldo.',
+          title: Text(
+            conSesion
+                ? '¿Reemplazar los datos de tu empresa?'
+                : '¿Agregar la empresa del respaldo?',
+          ),
+          content: Text(
+            conSesion
+                ? 'Se reemplazarán los datos de tu empresa: cuentas de tu empresa, '
+                      'productos, compras, ventas y gastos. Las otras empresas del teléfono no se tocan. '
+                      'No se puede deshacer. Exporta antes si quieres conservar los datos actuales. '
+                      'Después deberás iniciar sesión con una cuenta del respaldo.'
+                : 'Se agregará la empresa del respaldo con sus cuentas, productos, compras, '
+                      'ventas y gastos. Las otras empresas del teléfono no se tocan. '
+                      'Después podrás iniciar sesión con una cuenta del respaldo.',
           ),
           actions: [
             TextButton(
@@ -88,7 +100,7 @@ class AccionesRespaldo {
             FilledButton(
               key: const ValueKey('confirmar-restauracion'),
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Reemplazar datos'),
+              child: Text(conSesion ? 'Reemplazar datos' : 'Agregar empresa'),
             ),
           ],
         ),

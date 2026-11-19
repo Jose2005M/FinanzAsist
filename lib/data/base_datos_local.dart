@@ -270,31 +270,6 @@ class BaseDatosLocal {
   Future<Uint8List> leerArchivo() =>
       conArchivoCerrado((ubicacion) => File(ubicacion).readAsBytes());
 
-  /// Sustituye la base por el archivo [candidato] y aplica las migraciones.
-  /// Si la nueva base no abre, recupera el archivo anterior.
-  Future<void> reemplazarArchivo(String candidato) =>
-      conArchivoCerrado((destino) async {
-        final actual = File(destino);
-        final anterior = File('$destino.anterior');
-        final habiaArchivo = await actual.exists();
-        if (habiaArchivo) await actual.copy(anterior.path);
-        try {
-          await borrarAuxiliares(destino);
-          await File(candidato).copy(destino);
-          await (await _abrir()).close();
-        } catch (_) {
-          await borrarAuxiliares(destino);
-          if (habiaArchivo) {
-            await anterior.copy(destino);
-          } else if (await actual.exists()) {
-            await actual.delete();
-          }
-          rethrow;
-        } finally {
-          if (await anterior.exists()) await anterior.delete();
-        }
-      });
-
   /// Borra los archivos de diario y WAL que SQLite deja junto a [ubicacion].
   static Future<void> borrarAuxiliares(String ubicacion) async {
     for (final sufijo in _auxiliares) {

@@ -54,6 +54,7 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   sqflite_common_ffi: ^2.4.6
+  flutter_launcher_icons: ^0.14.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -96,3 +97,16 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# Ícono de la app en Android, generado desde el símbolo de la marca.
+# Regenerar: flutter test tool/generar_icono_test.dart
+#            dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icono/icono.png"
+  adaptive_icon_background: "#FFF3D6"
+  adaptive_icon_foreground: "assets/icono/icono_adaptable.png"
+  # La imagen ya deja el margen de la zona segura de Android.
+  adaptive_icon_foreground_inset: 0
+  min_sdk_android: 21

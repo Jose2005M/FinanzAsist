@@ -77,20 +77,28 @@ class GestionFalsa implements GestionDispositivo {
 }
 
 class AutenticacionFalsa extends AutenticacionLocal {
-  AutenticacionFalsa({this.permiteAdministrador = true, this.error})
-    : super(base: BaseDatosLocal(factory: databaseFactoryFfi));
+  AutenticacionFalsa({
+    this.permiteAdministrador = true,
+    this.requiereAutorizacion = true,
+    this.error,
+  }) : super(base: BaseDatosLocal(factory: databaseFactoryFfi));
   final bool permiteAdministrador;
+  final bool requiereAutorizacion;
   final AccesoException? error;
-  final llamadas = <(DatosAdministrador, String, String)>[];
+  final llamadas = <(DatosAdministrador, String?, String?)>[];
 
   @override
   Future<bool> puedeCrearAdministrador() async => permiteAdministrador;
 
   @override
+  Future<bool> administradorRequiereAutorizacion() async =>
+      requiereAutorizacion;
+
+  @override
   Future<void> crearAdministrador(
     DatosAdministrador datos, {
-    required String correoPropietario,
-    required String clavePropietario,
+    String? correoPropietario,
+    String? clavePropietario,
   }) async {
     llamadas.add((datos, correoPropietario, clavePropietario));
     if (error case final error?) throw error;
@@ -442,6 +450,32 @@ void main() {
       expect(datos.clave, 'clave del administrador');
       expect(correo, 'dueno@empresa.com');
       expect(clave, 'mi frase de acceso 2026');
+      expect(find.byType(CrearAdministradorScreen), findsNothing);
+    });
+
+    testWidgets('en un teléfono sin cuentas no pide autorización', (
+      tester,
+    ) async {
+      final auth = AutenticacionFalsa(requiereAutorizacion: false);
+      await abrir(tester, auth);
+      await abrirFormulario(tester);
+
+      expect(find.text('Autorización del propietario'), findsNothing);
+      expect(find.byKey(const ValueKey('correo-propietario')), findsNothing);
+      for (final (clave, valor) in [
+        ('nombre-admin', 'Laura Gómez'),
+        ('correo-admin', 'admin@finanzasist.com'),
+        ('clave-admin', 'clave del administrador'),
+        ('confirmar-clave-admin', 'clave del administrador'),
+      ]) {
+        await tester.enterText(find.byKey(ValueKey(clave)), valor);
+      }
+      await enviar(tester);
+
+      final (datos, correo, clave) = auth.llamadas.single;
+      expect(datos.correo, 'admin@finanzasist.com');
+      expect(correo, isNull);
+      expect(clave, isNull);
       expect(find.byType(CrearAdministradorScreen), findsNothing);
     });
   });

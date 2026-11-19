@@ -158,7 +158,7 @@ Esta versión cuenta con implementación local de HU-01, HU-02, HU-04, HU-05, HU
 
 | Historia | Estado | Funcionalidad por completar |
 | --- | --- | --- |
-| HU-03 | Implementada localmente | Usuarios por empresa con propietario, encargado de inventario, vendedor y consulta. El propietario gestiona empleados, gastos y respaldos; el encargado registra productos, existencias y compras; el vendedor registra y consulta solo sus ventas, sin costos; consulta solo lee. Administrador único del dispositivo, autorizado por un propietario activo: panel por empresa para activar/desactivar y restablecer claves de propietarios y trabajadores, sin acceso a datos de negocio ni respaldos. Permisos verificados en SQLite y reflejados en la interfaz; esquema v7 conserva cuentas y guías de v6. |
+| HU-03 | Implementada localmente | Usuarios por empresa con propietario, encargado de inventario, vendedor y consulta. El propietario gestiona empleados, gastos y respaldos; el encargado registra productos, existencias y compras; el vendedor registra y consulta solo sus ventas, sin costos; consulta solo lee. Administrador único del dispositivo: lo crea el primero en un teléfono sin cuentas y, si ya hay empresas, con la autorización de un propietario activo; panel por empresa para activar/desactivar y restablecer claves de propietarios y trabajadores, sin acceso a datos de negocio ni respaldos. Permisos verificados en SQLite y reflejados en la interfaz; esquema v7 conserva cuentas y guías de v6. |
 | HU-11 | Pendiente | Crear categorías y subcategorías y filtrar por ellas. |
 | HU-12 | Pendiente | Clientes, asociación con ventas e historial por cliente. |
 | HU-13 | Pendiente | Proveedores, asociación con compras y consultas por proveedor. |
@@ -171,7 +171,7 @@ Esta versión cuenta con implementación local de HU-01, HU-02, HU-04, HU-05, HU
 
 ### Otros límites de esta entrega
 
-No hay verificación ni recuperación por correo, cambio de contraseña del propietario ni edición de cuentas y empresas. El propietario sí puede restablecer contraseñas de empleados. Sí existe la exportación y restauración manual de la base completa desde el menú de la cuenta, disponible solo para el propietario cuando el dispositivo tiene un único propietario, aunque tenga empleados. Tampoco hay anulación o edición de compras y ventas confirmadas, devoluciones ni edición o eliminación de gastos. Eliminar los datos de Android o desinstalar la aplicación puede eliminar los registros locales.
+No hay verificación ni recuperación por correo, cambio de contraseña del propietario ni edición de cuentas y empresas. El propietario sí puede restablecer contraseñas de empleados. Sí existe la exportación y restauración manual por empresa: el propietario respalda solo sus datos y cuentas, restaura su misma empresa sin alterar otras ni al administrador, y desde el acceso se puede agregar una empresa ausente si sus correos no chocan con cuentas existentes. Tampoco hay anulación o edición de compras y ventas confirmadas, devoluciones ni edición o eliminación de gastos. Eliminar los datos de Android o desinstalar la aplicación puede eliminar los registros locales.
 
 ### Documentación de referencia
 

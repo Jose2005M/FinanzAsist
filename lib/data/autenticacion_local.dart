@@ -219,11 +219,8 @@ class AutenticacionLocal extends ChangeNotifier {
       if (await _correoRegistrado(tx, correo)) {
         throw const AccesoException(_correoEnUso);
       }
-      final primera = (await tx.query(
-        'cuentas',
-        columns: ['id'],
-        limit: 1,
-      )).isEmpty;
+      // El administrador no cuenta: no tiene negocio que adopte los datos.
+      final primera = !await _hayCuentasDeNegocio(tx);
       final anteriores = await tx.query(
         'empresas',
         where: 'id = ?',
@@ -275,23 +272,39 @@ class AutenticacionLocal extends ChangeNotifier {
     return cuenta;
   }
 
-  /// El administrador se crea una sola vez y con la autorización de un
-  /// propietario activo, para que nadie más pueda ver las cuentas.
+  Future<bool> _hayCuentasDeNegocio(DatabaseExecutor db) async =>
+      (await db.query(
+        'cuentas',
+        columns: ['id'],
+        where: 'rol <> ?',
+        whereArgs: [RolCuenta.administrador.name],
+        limit: 1,
+      )).isNotEmpty;
+
+  /// Un solo administrador por teléfono. En un teléfono sin cuentas lo crea
+  /// el primero que llegue; con empresas registradas exige la autorización
+  /// de un propietario activo, porque el administrador puede restablecer
+  /// contraseñas y así entrar a cualquier negocio.
   Future<bool> puedeCrearAdministrador() async {
     final db = await base.abrir;
+    if (await _contar(db, RolCuenta.administrador) > 0) return false;
+    if (!await _hayCuentasDeNegocio(db)) return true;
     return (await db.query(
-          'cuentas',
-          columns: ['id'],
-          where: "rol = 'propietario' AND activa = 1",
-          limit: 1,
-        )).isNotEmpty &&
-        await _contar(db, RolCuenta.administrador) == 0;
+      'cuentas',
+      columns: ['id'],
+      where: "rol = 'propietario' AND activa = 1",
+      limit: 1,
+    )).isNotEmpty;
   }
+
+  /// `true` si ya hay cuentas: crear el administrador pide un propietario.
+  Future<bool> administradorRequiereAutorizacion() async =>
+      _hayCuentasDeNegocio(await base.abrir);
 
   Future<void> crearAdministrador(
     DatosAdministrador datos, {
-    required String correoPropietario,
-    required String clavePropietario,
+    String? correoPropietario,
+    String? clavePropietario,
   }) => _ejecutar(() async {
     datos.validar();
     final correo = DatosRegistro.normalizarCorreo(datos.correo);
@@ -299,18 +312,26 @@ class AutenticacionLocal extends ChangeNotifier {
     if (await _contar(db, RolCuenta.administrador) > 0) {
       throw const AccesoException(_yaHayAdministrador);
     }
-    final filas = await db.query(
-      'cuentas',
-      where: 'correo = ? AND rol = ?',
-      whereArgs: [
-        DatosRegistro.normalizarCorreo(correoPropietario),
-        RolCuenta.propietario.name,
-      ],
-    );
-    final duenio = filas.isEmpty ? null : filas.single;
-    final valida = await Claves.coincide(clavePropietario, duenio);
-    if (duenio == null || !valida || duenio['activa'] != 1) {
-      throw const AccesoException(_propietarioIncorrecto);
+    final libre = !await _hayCuentasDeNegocio(db);
+    Map<String, Object?>? duenio;
+    if (!libre) {
+      if (correoPropietario == null || clavePropietario == null) {
+        throw const AccesoException(_propietarioIncorrecto);
+      }
+      final filas = await db.query(
+        'cuentas',
+        where: 'correo = ? AND rol = ?',
+        whereArgs: [
+          DatosRegistro.normalizarCorreo(correoPropietario),
+          RolCuenta.propietario.name,
+        ],
+      );
+      duenio = filas.isEmpty ? null : filas.single;
+      // Mismo trabajo de derivación para un correo inexistente.
+      final valida = await Claves.coincide(clavePropietario, duenio);
+      if (duenio == null || !valida || duenio['activa'] != 1) {
+        throw const AccesoException(_propietarioIncorrecto);
+      }
     }
     if (await _correoRegistrado(db, correo)) {
       throw const AccesoException(_correoEnUso);
@@ -323,19 +344,29 @@ class AutenticacionLocal extends ChangeNotifier {
       if (await _correoRegistrado(tx, correo)) {
         throw const AccesoException(_correoEnUso);
       }
-      final autorizante = await tx.query(
-        'cuentas',
-        columns: ['id'],
-        where: 'id = ? AND rol = ? AND activa = 1 AND hash = ? AND sal = ?',
-        whereArgs: [
-          duenio['id'],
-          RolCuenta.propietario.name,
-          duenio['hash'],
-          duenio['sal'],
-        ],
-      );
-      if (autorizante.isEmpty) {
-        throw const AccesoException(_propietarioIncorrecto);
+      if (duenio == null) {
+        // Se registró una empresa mientras se calculaba la contraseña.
+        if (await _hayCuentasDeNegocio(tx)) {
+          throw const AccesoException(
+            'Ya hay empresas en este teléfono: crear el administrador '
+            'necesita la autorización de un propietario.',
+          );
+        }
+      } else {
+        final autorizante = await tx.query(
+          'cuentas',
+          columns: ['id'],
+          where: 'id = ? AND rol = ? AND activa = 1 AND hash = ? AND sal = ?',
+          whereArgs: [
+            duenio['id'],
+            RolCuenta.propietario.name,
+            duenio['hash'],
+            duenio['sal'],
+          ],
+        );
+        if (autorizante.isEmpty) {
+          throw const AccesoException(_propietarioIncorrecto);
+        }
       }
       // La empresa propia del administrador nunca tiene datos de negocio.
       return _insertarCuenta(

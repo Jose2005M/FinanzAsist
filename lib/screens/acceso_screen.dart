@@ -13,7 +13,7 @@ class AccesoScreen extends StatefulWidget {
   const AccesoScreen({super.key, required this.autenticacion, this.respaldo});
   final AutenticacionLocal autenticacion;
 
-  /// Permite restaurar un respaldo solo si el dispositivo no tiene cuentas.
+  /// Permite agregar una empresa desde su respaldo sin alterar otras empresas.
   final AccionesRespaldo? respaldo;
 
   @override
@@ -45,10 +45,21 @@ class _AccesoScreenState extends State<AccesoScreen> {
   }
 
   Future<void> _crearAdministrador() async {
+    bool requiereAutorizacion;
+    try {
+      requiereAutorizacion = await widget.autenticacion
+          .administradorRequiereAutorizacion();
+    } on Exception {
+      // Ante la duda se pide autorización; el servicio decide al final.
+      requiereAutorizacion = true;
+    }
+    if (!mounted) return;
     await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (_) =>
-            CrearAdministradorScreen(autenticacion: widget.autenticacion),
+        builder: (_) => CrearAdministradorScreen(
+          autenticacion: widget.autenticacion,
+          requiereAutorizacion: requiereAutorizacion,
+        ),
       ),
     );
     if (mounted) {
@@ -616,7 +627,7 @@ class _AccesoScreenState extends State<AccesoScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Tus datos se guardan en este dispositivo.\nSin sincronización ni recuperación por correo. Exporta respaldos desde el menú de tu cuenta.',
+                'Tus datos se guardan en este dispositivo.\nSin sincronización ni recuperación por correo. El propietario puede exportar respaldos de su empresa desde el menú de su cuenta.',
                 style: TextStyle(
                   fontSize: 13,
                   height: 1.45,

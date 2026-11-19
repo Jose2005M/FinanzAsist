@@ -73,7 +73,12 @@ La lista muestra nombre, correo, rol y estado **Activa/Desactivada**, con el pro
 
 ### Administrador del dispositivo
 
-Solo puede existir un administrador por teléfono. En la pantalla de acceso, **Crear administrador** aparece cuando hay al menos un propietario activo y todavía no existe administrador. Introduce el correo y la contraseña de un propietario activo para autorizar el alta, y luego el nombre, correo y contraseña del administrador. Su correo debe ser único en el dispositivo. Al terminar, se inicia su sesión.
+Solo puede existir un administrador por teléfono. En la pantalla de acceso, **Crear administrador** aparece mientras todavía no exista uno:
+
+- **Teléfono sin cuentas:** quien lo cree primero queda como administrador; solo se piden su nombre, correo y contraseña.
+- **Teléfono con empresas registradas:** además se pide el correo y la contraseña de un propietario activo para autorizar el alta. Esto evita que alguien con el teléfono en la mano se haga administrador, restablezca la contraseña de un propietario y entre a su negocio.
+
+El correo del administrador debe ser único en el dispositivo. Al terminar, se inicia su sesión.
 
 El administrador entra únicamente al panel **Usuarios del dispositivo**. Las cuentas se agrupan por empresa, con su propietario y trabajadores, mostrando nombre, correo, rol y estado **Activa/Desactivada**. Su propia cuenta aparece aparte como **Administrador (tú)**, sin acciones. No tiene negocio propio ni acceso a inventario, compras, ventas, gastos, reportes, respaldos o gestión de usuarios de una empresa.
 
@@ -94,12 +99,11 @@ El equipo selecciona el modo al ejecutar la aplicación; no existe un interrupto
 
 Los datos de Android se guardan en el dispositivo. Esta versión no ofrece sincronización, pero sí respaldos manuales:
 
-- **Exportar respaldo:** en **Inventario**, abre el menú de la cuenta (icono de persona) y elige **Exportar respaldo**. Elige dónde guardar el archivo `finanzasist-respaldo-AAAA-MM-DD-HHMM.db`, por ejemplo en Google Drive o en una memoria. El archivo contiene todos los datos del negocio y las cuentas del dispositivo: guárdalo en un lugar seguro.
-- **Restaurar respaldo:** desde el mismo menú, elige **Restaurar respaldo** y el archivo. Tras confirmar, todos los datos del dispositivo se reemplazan por los del respaldo y debes iniciar sesión con una cuenta del respaldo. No se puede deshacer: exporta antes si quieres conservar los datos actuales.
-- **En un teléfono nuevo o recién instalado,** la pantalla de acceso muestra **Restaurar un respaldo** mientras no exista ninguna cuenta.
+- **Exportar respaldo:** como propietario, abre el menú de la cuenta y elige **Exportar respaldo**. Guarda el archivo `finanzasist-<empresa>-AAAA-MM-DD-HHMM.db` en un lugar seguro. Contiene únicamente los datos y las cuentas de tu empresa (propietario y empleados), incluidas sus preferencias de guías. No incluye otras empresas ni al administrador del dispositivo, aunque compartan teléfono.
+- **Restaurar tu empresa:** inicia sesión como propietario y elige **Restaurar respaldo**. Solo se admite un respaldo con el mismo identificador de empresa. Tras confirmar, se reemplazan las cuentas, productos, compras, ventas y gastos de tu empresa. Las otras empresas y el administrador quedan intactos. La sesión se cierra y debes entrar con una cuenta del respaldo. Exporta antes si quieres conservar el estado actual.
+- **Agregar una empresa desde el acceso:** **Restaurar un respaldo** permite agregar una empresa que aún no esté en el teléfono, incluso si ya hay otras empresas. No reemplaza datos existentes. Si esa empresa ya existe, inicia sesión como su propietario para restaurarla. Los correos de sus cuentas no deben estar usados por otras empresas ni por el administrador.
 
-La aplicación rechaza archivos dañados, de otras aplicaciones o creados por una versión más nueva, y en esos casos conserva los datos actuales. Solo el propietario puede exportar o restaurar respaldos en una sesión abierta. El dispositivo debe tener un solo propietario; los empleados de su empresa no bloquean el respaldo. Exporta un respaldo antes de borrar los datos de la aplicación o desinstalarla.
-
+Solo el propietario puede exportar y restaurar dentro de una sesión; vendedores, encargados, consulta y administrador no pueden hacerlo. Se aceptan respaldos antiguos de dispositivo completo si contienen una sola empresa de negocio; el administrador del archivo no se importa. Los respaldos antiguos sin cuenta de propietario solo se pueden importar en un teléfono sin cuentas. Se rechazan respaldos con varias empresas, archivos dañados, de otras aplicaciones o de una versión más nueva, conservando los datos actuales si falla la restauración. Exporta antes de borrar los datos de la aplicación o desinstalarla.
 ## 2. Moverse por la aplicación
 
 En la primera visita a cada módulo verás una guía con su propósito y cómo empezar. Pulsa **Ver pasos** para ampliar las instrucciones o **Entendido** para ocultarlas. Puedes consultarlas después desde **Guía de Inventario**, **Guía de Compras**, **Guía de Ventas**, **Guía de Gastos** o **Guía de Reportes**. La aplicación recuerda esta elección para tu cuenta.
