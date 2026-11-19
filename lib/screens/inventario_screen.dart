@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -20,12 +22,16 @@ class InventarioScreen extends StatefulWidget {
     this.empresa,
     this.correo,
     this.cerrarSesion,
+    this.exportarRespaldo,
+    this.restaurarRespaldo,
   });
 
   final ProductoRepository repositorio;
   final String? empresa;
   final String? correo;
   final VoidCallback? cerrarSesion;
+  final Future<void> Function()? exportarRespaldo;
+  final Future<void> Function()? restaurarRespaldo;
 
   @override
   State<InventarioScreen> createState() => _InventarioScreenState();
@@ -84,6 +90,17 @@ class _InventarioScreenState extends State<InventarioScreen>
         .showSnackBar(const SnackBar(content: Text('Producto registrado')));
   }
 
+  void _accionCuenta(String accion) {
+    switch (accion) {
+      case 'exportar':
+        unawaited(widget.exportarRespaldo?.call());
+      case 'restaurar':
+        unawaited(widget.restaurarRespaldo?.call());
+      default:
+        widget.cerrarSesion?.call();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final colores = Theme.of(context).colorScheme;
@@ -97,7 +114,7 @@ class _InventarioScreenState extends State<InventarioScreen>
               PopupMenuButton<String>(
                 tooltip: 'Cuenta de empresa',
                 icon: const Icon(Icons.account_circle_outlined),
-                onSelected: (_) => widget.cerrarSesion!(),
+                onSelected: _accionCuenta,
                 itemBuilder: (_) => [
                   PopupMenuItem<String>(
                     enabled: false,
@@ -106,6 +123,26 @@ class _InventarioScreenState extends State<InventarioScreen>
                       style: TextStyle(color: colores.onSurface),
                     ),
                   ),
+                  if (widget.exportarRespaldo != null)
+                    const PopupMenuItem<String>(
+                      key: ValueKey('menu-exportar-respaldo'),
+                      value: 'exportar',
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(Icons.save_alt_outlined),
+                        title: Text('Exportar respaldo'),
+                      ),
+                    ),
+                  if (widget.restaurarRespaldo != null)
+                    const PopupMenuItem<String>(
+                      key: ValueKey('menu-restaurar-respaldo'),
+                      value: 'restaurar',
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(Icons.settings_backup_restore),
+                        title: Text('Restaurar respaldo'),
+                      ),
+                    ),
                   const PopupMenuItem<String>(
                     value: 'salir',
                     child: ListTile(

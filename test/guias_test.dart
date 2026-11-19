@@ -135,7 +135,7 @@ void main() {
     final actual = BaseDatosLocal(factory: databaseFactoryFfi, ruta: ruta);
     try {
       final migrada = await actual.abrir;
-      expect(await migrada.getVersion(), 4);
+      expect(await migrada.getVersion(), BaseDatosLocal.version);
       expect((await migrada.query('productos')).single['cantidad'], 7);
       expect(await migrada.query('guias_vistas'), isEmpty);
     } finally {

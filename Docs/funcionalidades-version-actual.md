@@ -158,7 +158,7 @@ Esta versión cuenta con implementación local de HU-01, HU-02, HU-04, HU-05, HU
 
 | Historia | Estado | Funcionalidad por completar |
 | --- | --- | --- |
-| HU-03 | Parcial | Usuarios adicionales, roles y permisos administrables. |
+| HU-03 | Parcial | Existen los roles propietario y administrador: un administrador por dispositivo, creado con autorización de un propietario, que lista las cuentas, las activa o desactiva y restablece contraseñas. Faltan usuarios adicionales por empresa y permisos configurables. |
 | HU-11 | Pendiente | Crear categorías y subcategorías y filtrar por ellas. |
 | HU-12 | Pendiente | Clientes, asociación con ventas e historial por cliente. |
 | HU-13 | Pendiente | Proveedores, asociación con compras y consultas por proveedor. |
@@ -171,7 +171,7 @@ Esta versión cuenta con implementación local de HU-01, HU-02, HU-04, HU-05, HU
 
 ### Otros límites de esta entrega
 
-No hay verificación por correo, recuperación o cambio de contraseña, edición de cuentas y empresas, exportación, copia de seguridad o restauración desde la interfaz. Tampoco hay anulación o edición de compras y ventas confirmadas, devoluciones ni edición o eliminación de gastos. Eliminar los datos de Android o desinstalar la aplicación puede eliminar los registros locales.
+No hay verificación por correo, recuperación o cambio de contraseña ni edición de cuentas y empresas. Sí existe la exportación y restauración manual de la base completa desde el menú de la cuenta, disponible cuando el dispositivo tiene una sola cuenta. Tampoco hay anulación o edición de compras y ventas confirmadas, devoluciones ni edición o eliminación de gastos. Eliminar los datos de Android o desinstalar la aplicación puede eliminar los registros locales.
 
 ### Documentación de referencia
 

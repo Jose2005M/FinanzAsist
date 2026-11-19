@@ -1,29 +1,48 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:path/path.dart' as path;
 import 'package:sqflite/sqflite.dart';
 
 /// Esquema compartido de cuentas y registros del negocio; migra sin borrar datos.
 class BaseDatosLocal {
   BaseDatosLocal({DatabaseFactory? factory, this.ruta})
-    : _factory = factory ?? databaseFactory;
-  final DatabaseFactory _factory;
+    : factory = factory ?? databaseFactory;
+
+  /// Versión del esquema que crea y entiende esta compilación.
+  static const version = 5;
+  static const _auxiliares = ['-wal', '-shm', '-journal'];
+
+  final DatabaseFactory factory;
   final String? ruta;
   Future<Database>? _apertura;
-  Future<Database> get abrir =>
-      _apertura ??= _abrir().catchError((Object error) {
-        _apertura = null;
-        throw error;
-      });
+  Future<void>? _mantenimiento;
+
+  Future<String> get ubicacion async =>
+      ruta ?? path.join(await factory.getDatabasesPath(), 'finanzasist.db');
+
+  /// Espera a que termine una exportación o restauración antes de abrir.
+  Future<Database> get abrir async {
+    while (_mantenimiento != null) {
+      await _mantenimiento;
+    }
+    return _apertura ??= _abrir().catchError((Object error) {
+      _apertura = null;
+      throw error;
+    });
+  }
+
   Future<Database> _abrir() async {
-    final ubicacion =
-        ruta ?? path.join(await _factory.getDatabasesPath(), 'finanzasist.db');
-    return _factory.openDatabase(
-      ubicacion,
+    return factory.openDatabase(
+      await ubicacion,
       options: OpenDatabaseOptions(
-        version: 4,
+        version: version,
         onUpgrade: (db, anterior, actual) async {
           if (anterior < 2) await _crearGastos(db);
           if (anterior < 3) await _crearCuentas(db);
           if (anterior < 4) await _crearGuias(db);
+          if (anterior < 5) await _agregarRol(db);
         },
         onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
         onCreate: (db, version) async {
@@ -43,8 +62,23 @@ class BaseDatosLocal {
           await _crearGastos(db);
           await _crearCuentas(db);
           await _crearGuias(db);
+          await _agregarRol(db);
         },
       ),
+    );
+  }
+
+  /// Versión 5: las cuentas existentes quedan como propietarias y el índice
+  /// parcial permite un solo administrador por dispositivo.
+  Future<void> _agregarRol(DatabaseExecutor db) async {
+    final columnas = await db.rawQuery('PRAGMA table_info(cuentas)');
+    if (!columnas.any((columna) => columna['name'] == 'rol')) {
+      await db.execute(
+        "ALTER TABLE cuentas ADD COLUMN rol TEXT NOT NULL DEFAULT 'propietario' CHECK(rol IN ('propietario', 'administrador'))",
+      );
+    }
+    await db.execute(
+      "CREATE UNIQUE INDEX IF NOT EXISTS un_administrador ON cuentas(rol) WHERE rol = 'administrador'",
     );
   }
 
@@ -76,6 +110,72 @@ class BaseDatosLocal {
       FOREIGN KEY(empresa, usuario) REFERENCES usuarios(empresa, id)
     )
   ''');
+
+  /// Ejecuta [accion] con el archivo cerrado. Las transacciones en curso
+  /// terminan antes y nadie puede abrir la base hasta que [accion] acabe.
+  Future<T> conArchivoCerrado<T>(
+    Future<T> Function(String ubicacion) accion,
+  ) async {
+    while (_mantenimiento != null) {
+      await _mantenimiento;
+    }
+    final fin = Completer<void>();
+    _mantenimiento = fin.future;
+    try {
+      // Una apertura fallida no tiene nada que cerrar.
+      final db = await _apertura?.then<Database?>(
+        (db) => db,
+        onError: (Object _) => null,
+      );
+      _apertura = null;
+      if (db != null) {
+        // La transacción vacía espera a que terminen las que están en curso.
+        await db.transaction((_) async {});
+        await db.close();
+      }
+      return await accion(await ubicacion);
+    } finally {
+      _mantenimiento = null;
+      fin.complete();
+    }
+  }
+
+  /// Copia completa y consistente del archivo de la base.
+  Future<Uint8List> leerArchivo() =>
+      conArchivoCerrado((ubicacion) => File(ubicacion).readAsBytes());
+
+  /// Sustituye la base por el archivo [candidato] y aplica las migraciones.
+  /// Si la nueva base no abre, recupera el archivo anterior.
+  Future<void> reemplazarArchivo(String candidato) =>
+      conArchivoCerrado((destino) async {
+        final actual = File(destino);
+        final anterior = File('$destino.anterior');
+        final habiaArchivo = await actual.exists();
+        if (habiaArchivo) await actual.copy(anterior.path);
+        try {
+          await borrarAuxiliares(destino);
+          await File(candidato).copy(destino);
+          await (await _abrir()).close();
+        } catch (_) {
+          await borrarAuxiliares(destino);
+          if (habiaArchivo) {
+            await anterior.copy(destino);
+          } else if (await actual.exists()) {
+            await actual.delete();
+          }
+          rethrow;
+        } finally {
+          if (await anterior.exists()) await anterior.delete();
+        }
+      });
+
+  /// Borra los archivos de diario y WAL que SQLite deja junto a [ubicacion].
+  static Future<void> borrarAuxiliares(String ubicacion) async {
+    for (final sufijo in _auxiliares) {
+      final archivo = File('$ubicacion$sufijo');
+      if (await archivo.exists()) await archivo.delete();
+    }
+  }
 
   Future<void> cerrar() async {
     final apertura = _apertura;

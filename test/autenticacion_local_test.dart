@@ -1,3 +1,8 @@
+// PBKDF2 con 600 000 iteraciones: en paralelo con otros archivos que
+// también derivan claves, una prueba puede superar los 30 s por defecto.
+@Timeout.factor(4)
+library;
+
 import 'dart:convert';
 import 'dart:io';
 
@@ -364,7 +369,7 @@ void main() {
       );
       auth = AutenticacionLocal(base: base);
       await auth.registrar(registro());
-      expect(await (await base.abrir).getVersion(), 4);
+      expect(await (await base.abrir).getVersion(), BaseDatosLocal.version);
       expect(
         (await repositorio().obtenerPorId(producto.id))!.nombre,
         'Arroz anterior',

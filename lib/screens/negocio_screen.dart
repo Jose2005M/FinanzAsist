@@ -16,11 +16,15 @@ class NegocioScreen extends StatefulWidget {
     this.empresa,
     this.correo,
     this.cerrarSesion,
+    this.exportarRespaldo,
+    this.restaurarRespaldo,
   });
   final NegocioRepository repositorio;
   final String? empresa;
   final String? correo;
   final VoidCallback? cerrarSesion;
+  final Future<void> Function()? exportarRespaldo;
+  final Future<void> Function()? restaurarRespaldo;
 
   @override
   State<NegocioScreen> createState() => _NegocioScreenState();
@@ -93,6 +97,8 @@ class _NegocioScreenState extends State<NegocioScreen> {
       empresa: widget.empresa,
       correo: widget.correo,
       cerrarSesion: widget.cerrarSesion,
+      exportarRespaldo: widget.exportarRespaldo,
+      restaurarRespaldo: widget.restaurarRespaldo,
     ),
     1 || 2 => OperacionesScreen(
       key: _pantallas[modulo],

@@ -7,11 +7,14 @@ import 'data/negocio_repository.dart';
 import 'data/repositorio_simulado.dart';
 import 'data/autenticacion_local.dart';
 import 'data/base_datos_local.dart';
+import 'data/respaldo_local.dart';
+import 'data/selector_archivos.dart';
 import 'screens/inventario_screen.dart';
 import 'screens/negocio_screen.dart';
 import 'screens/sesion_screen.dart';
 import 'theme/tema_finanzasist.dart';
 import 'data/almacen_guias.dart';
+import 'widgets/acciones_respaldo.dart';
 import 'widgets/guia_modulo.dart';
 
 void main() {
@@ -27,11 +30,13 @@ class FinanzAsistApp extends StatefulWidget {
     this.repositorio,
     this.autenticacion,
     this.almacenGuias,
+    this.selectorArchivos,
   });
 
   final ProductoRepository? repositorio;
   final AutenticacionLocal? autenticacion;
   final AlmacenGuias? almacenGuias;
+  final SelectorArchivos? selectorArchivos;
 
   @override
   State<FinanzAsistApp> createState() => _FinanzAsistAppState();
@@ -39,6 +44,7 @@ class FinanzAsistApp extends StatefulWidget {
 
 class _FinanzAsistAppState extends State<FinanzAsistApp> {
   late final AutenticacionLocal? _autenticacion;
+  late final AccionesRespaldo? _respaldo;
   late final _guias = widget.almacenGuias ?? AlmacenGuiasMemoria();
   late final _repositorioDemo = widget.repositorio ?? RepositorioSimulado();
 
@@ -50,6 +56,14 @@ class _FinanzAsistAppState extends State<FinanzAsistApp> {
         (widget.repositorio == null && !kIsWeb
             ? AutenticacionLocal(base: BaseDatosLocal())
             : null);
+    final autenticacion = _autenticacion;
+    _respaldo = autenticacion == null
+        ? null
+        : AccionesRespaldo(
+            respaldo: RespaldoLocal(base: autenticacion.base),
+            selector:
+                widget.selectorArchivos ?? const SelectorArchivosSistema(),
+          );
   }
 
   @override
@@ -73,7 +87,7 @@ class _FinanzAsistAppState extends State<FinanzAsistApp> {
       theme: TemaFinanzAsist.crear(),
       builder: (context, child) => AreaGuias(almacen: _guias, child: child!),
       home: _autenticacion != null
-          ? SesionScreen(autenticacion: _autenticacion)
+          ? SesionScreen(autenticacion: _autenticacion, respaldo: _respaldo)
           : _repositorioDemo is NegocioRepository
           ? NegocioScreen(repositorio: _repositorioDemo)
           : InventarioScreen(repositorio: _repositorioDemo),

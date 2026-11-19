@@ -2,13 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data/autenticacion_local.dart';
+import '../widgets/acciones_respaldo.dart';
+import 'crear_administrador_screen.dart';
 import '../widgets/marca_finanzasist.dart';
 import '../theme/tema_finanzasist.dart';
 import '../widgets/superficies_finanzasist.dart';
 
 class AccesoScreen extends StatefulWidget {
-  const AccesoScreen({super.key, required this.autenticacion});
+  const AccesoScreen({super.key, required this.autenticacion, this.respaldo});
   final AutenticacionLocal autenticacion;
+
+  /// Permite restaurar un respaldo solo si el dispositivo no tiene cuentas.
+  final AccionesRespaldo? respaldo;
 
   @override
   State<AccesoScreen> createState() => _AccesoScreenState();
@@ -27,6 +32,54 @@ class _AccesoScreenState extends State<AccesoScreen> {
   bool _ocupado = false;
   bool _verClave = false;
   String? _error;
+  bool _restaurando = false;
+  late Future<bool> _restaurable = _consultarRestauracion();
+  late final Future<bool> _administrable = _consultarAdministrador();
+
+  Future<bool> _consultarAdministrador() async {
+    try {
+      return await widget.autenticacion.puedeCrearAdministrador();
+    } on Exception {
+      // Si la base no abre, el acceso ya muestra su propio error.
+      return false;
+    }
+  }
+
+  Future<void> _crearAdministrador() async {
+    if (_ocupado || _restaurando) return;
+    FocusScope.of(context).unfocus();
+    // Al crearse, la sesión del administrador reemplaza esta pantalla.
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) =>
+            CrearAdministradorScreen(autenticacion: widget.autenticacion),
+      ),
+    );
+  }
+
+  Future<bool> _consultarRestauracion() async {
+    final respaldo = widget.respaldo;
+    if (respaldo == null) return false;
+    try {
+      return await respaldo.respaldo.restauracionSinSesion();
+    } on Exception {
+      // Si la base no abre, el acceso ya muestra su propio error.
+      return false;
+    }
+  }
+
+  Future<void> _restaurar() async {
+    final respaldo = widget.respaldo;
+    if (respaldo == null || _ocupado || _restaurando) return;
+    setState(() => _restaurando = true);
+    final restaurado = await respaldo.restaurar(context);
+    if (!mounted) return;
+    setState(() {
+      _restaurando = false;
+      _restaurable = _consultarRestauracion();
+    });
+    if (restaurado && _registro) _cambiarModo();
+  }
 
   @override
   void dispose() {
@@ -181,6 +234,8 @@ class _AccesoScreenState extends State<AccesoScreen> {
                           _panel(context),
                           const SizedBox(height: 24),
                           _informacionLocal(),
+                          _opcionRestaurar(),
+                          _opcionAdministrador(),
                         ],
                       ),
                     ),
@@ -506,6 +561,46 @@ class _AccesoScreenState extends State<AccesoScreen> {
     ],
   );
 
+  Widget _opcionAdministrador() => FutureBuilder<bool>(
+    future: _administrable,
+    builder: (context, consulta) {
+      if (consulta.data != true) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: TextButton.icon(
+          key: const ValueKey('crear-administrador-acceso'),
+          onPressed: _ocupado || _restaurando ? null : _crearAdministrador,
+          icon: const Icon(Icons.admin_panel_settings_outlined),
+          style: TextButton.styleFrom(
+            foregroundColor: ColoresFinanzAsist.secundaria,
+            minimumSize: const Size.fromHeight(48),
+          ),
+          label: const Text('Crear administrador'),
+        ),
+      );
+    },
+  );
+
+  Widget _opcionRestaurar() => FutureBuilder<bool>(
+    future: _restaurable,
+    builder: (context, consulta) {
+      if (consulta.data != true) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: TextButton.icon(
+          key: const ValueKey('restaurar-respaldo-acceso'),
+          onPressed: _ocupado || _restaurando ? null : _restaurar,
+          icon: const Icon(Icons.settings_backup_restore),
+          style: TextButton.styleFrom(
+            foregroundColor: ColoresFinanzAsist.secundaria,
+            minimumSize: const Size.fromHeight(48),
+          ),
+          label: const Text('Restaurar un respaldo'),
+        ),
+      );
+    },
+  );
+
   Widget _informacionLocal() => Padding(
     padding: const EdgeInsets.symmetric(horizontal: 12),
     child: Row(
@@ -524,7 +619,7 @@ class _AccesoScreenState extends State<AccesoScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Tus datos se guardan en este dispositivo.\nSin sincronización ni recuperación por correo.',
+                'Tus datos se guardan en este dispositivo.\nSin sincronización ni recuperación por correo. Exporta respaldos desde el menú de tu cuenta.',
                 style: TextStyle(
                   fontSize: 13,
                   height: 1.45,

@@ -1,12 +1,9 @@
-import 'dart:convert';
-import 'dart:math';
-
-import 'package:cryptography/cryptography.dart';
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../models/operacion.dart';
 import 'base_datos_local.dart';
+import 'claves.dart';
 
 class AccesoException implements Exception {
   const AccesoException(this.mensaje);
@@ -14,6 +11,9 @@ class AccesoException implements Exception {
   @override
   String toString() => mensaje;
 }
+
+/// El propietario gestiona su negocio; el administrador solo las cuentas.
+enum RolCuenta { propietario, administrador }
 
 class DatosRegistro {
   static const longitudMinimaClave = 8;
@@ -70,8 +70,29 @@ class DatosRegistro {
   }
 }
 
+class DatosAdministrador {
+  const DatosAdministrador({
+    required this.nombre,
+    required this.correo,
+    required this.clave,
+  });
+  final String nombre;
+  final String correo;
+  final String clave;
+
+  void validar() {
+    for (final error in [
+      DatosRegistro.validarNombre(nombre, 'el nombre del administrador', 100),
+      DatosRegistro.validarCorreo(correo),
+      DatosRegistro.validarClave(clave),
+    ]) {
+      if (error != null) throw AccesoException(error);
+    }
+  }
+}
+
 /// Solo AutenticacionLocal puede emitir una sesión. Se revoca en memoria
-/// y se verifica contra la cuenta dentro de cada transacción del negocio.
+/// y se verifica contra la cuenta dentro de cada transacción.
 class SesionEmpresa {
   SesionEmpresa._(Map<String, Object?> row)
     : cuentaId = row['id'] as String,
@@ -79,7 +100,8 @@ class SesionEmpresa {
       usuarioId = row['usuario'] as String,
       empresa = row['nombre_empresa'] as String,
       propietario = row['nombre'] as String,
-      correo = row['correo'] as String;
+      correo = row['correo'] as String,
+      rol = RolCuenta.values.byName(row['rol'] as String);
 
   final String cuentaId;
   final String empresaId;
@@ -87,17 +109,40 @@ class SesionEmpresa {
   final String empresa;
   final String propietario;
   final String correo;
+  final RolCuenta rol;
   bool _activa = true;
 
-  Future<void> verificar(DatabaseExecutor db) async {
+  bool get esAdministrador => rol == RolCuenta.administrador;
+
+  /// Acceso a los datos del negocio: solo para propietarios.
+  Future<void> verificar(DatabaseExecutor db) => _verificar(
+    db,
+    RolCuenta.propietario,
+    'La cuenta de administrador no accede a los datos de los negocios.',
+  );
+
+  /// Gestión de cuentas: solo para el administrador.
+  Future<void> verificarAdministrador(DatabaseExecutor db) => _verificar(
+    db,
+    RolCuenta.administrador,
+    'Solo el administrador puede gestionar las cuentas.',
+  );
+
+  Future<void> _verificar(
+    DatabaseExecutor db,
+    RolCuenta esperado,
+    String sinPermiso,
+  ) async {
     if (!_activa) {
       throw const AccesoException('Tu sesión terminó. Inicia sesión.');
     }
+    if (rol != esperado) throw AccesoException(sinPermiso);
     final cuentas = await db.query(
       'cuentas',
       columns: ['id'],
-      where: 'id = ? AND empresa = ? AND usuario = ? AND activa = 1',
-      whereArgs: [cuentaId, empresaId, usuarioId],
+      where:
+          'id = ? AND empresa = ? AND usuario = ? AND rol = ? AND activa = 1',
+      whereArgs: [cuentaId, empresaId, usuarioId, rol.name],
     );
     if (!_activa || cuentas.isEmpty) {
       throw const AccesoException('Tu sesión no es válida. Inicia sesión.');
@@ -105,24 +150,16 @@ class SesionEmpresa {
   }
 }
 
-// Se ejecuta fuera del hilo de UI para mantener el formulario receptivo.
-Future<List<int>> _derivarClave((String, List<int>, int) datos) async {
-  final algoritmo = Pbkdf2(
-    macAlgorithm: Hmac.sha256(),
-    iterations: datos.$3,
-    bits: 256,
-  );
-  final key = await algoritmo.deriveKeyFromPassword(
-    password: datos.$1,
-    nonce: datos.$2,
-  );
-  return key.extractBytes();
-}
-
 class AutenticacionLocal extends ChangeNotifier {
   AutenticacionLocal({required this.base});
   final BaseDatosLocal base;
-  static const iteraciones = 600000;
+  static const iteraciones = Claves.iteraciones;
+  static const _correoEnUso = 'Este correo ya tiene una cuenta. Inicia sesión.';
+  static const _propietarioIncorrecto =
+      'Correo o contraseña del propietario incorrectos.';
+  static const _yaHayAdministrador =
+      'Ya existe un administrador en este dispositivo.';
+
   SesionEmpresa? _sesion;
   SesionEmpresa? get sesion => _sesion;
   bool _ocupada = false;
@@ -155,34 +192,34 @@ class AutenticacionLocal extends ChangeNotifier {
     }
   }
 
-  Future<void> registrar(DatosRegistro datos) => _ejecutar(() async {
-    datos.validar();
-    final correo = DatosRegistro.normalizarCorreo(datos.correo);
-    final db = await base.abrir;
-    if ((await db.query(
-      'cuentas',
-      columns: ['id'],
-      where: 'correo = ?',
-      whereArgs: [correo],
-    )).isNotEmpty) {
-      throw const AccesoException(
-        'Este correo ya tiene una cuenta. Inicia sesión.',
-      );
-    }
-    final azar = Random.secure();
-    final sal = List<int>.generate(32, (_) => azar.nextInt(256));
-    final hash = await compute(_derivarClave, (datos.clave, sal, iteraciones));
-    return db.transaction((tx) async {
-      // Repetir bajo la transacción evita duplicados y empresas huérfanas.
-      if ((await tx.query(
+  Future<bool> _correoRegistrado(DatabaseExecutor db, String correo) async =>
+      (await db.query(
         'cuentas',
         columns: ['id'],
         where: 'correo = ?',
         whereArgs: [correo],
-      )).isNotEmpty) {
-        throw const AccesoException(
-          'Este correo ya tiene una cuenta. Inicia sesión.',
-        );
+      )).isNotEmpty;
+
+  Future<int> _contar(DatabaseExecutor db, RolCuenta rol) async =>
+      Sqflite.firstIntValue(
+        await db.rawQuery('SELECT COUNT(*) FROM cuentas WHERE rol = ?', [
+          rol.name,
+        ]),
+      ) ??
+      0;
+
+  Future<void> registrar(DatosRegistro datos) => _ejecutar(() async {
+    datos.validar();
+    final correo = DatosRegistro.normalizarCorreo(datos.correo);
+    final db = await base.abrir;
+    if (await _correoRegistrado(db, correo)) {
+      throw const AccesoException(_correoEnUso);
+    }
+    final clave = await Claves.nueva(datos.clave);
+    return db.transaction((tx) async {
+      // Repetir bajo la transacción evita duplicados y empresas huérfanas.
+      if (await _correoRegistrado(tx, correo)) {
+        throw const AccesoException(_correoEnUso);
       }
       final primera = (await tx.query(
         'cuentas',
@@ -197,25 +234,102 @@ class AutenticacionLocal extends ChangeNotifier {
       final empresaId = primera && anteriores.isNotEmpty
           ? 'negocio-local'
           : nuevoId();
-      final usuarioId = nuevoId();
-      await tx.insert('empresas', {
-        'id': empresaId,
-      }, conflictAlgorithm: ConflictAlgorithm.ignore);
-      await tx.insert('usuarios', {'empresa': empresaId, 'id': usuarioId});
-      final cuenta = <String, Object?>{
-        'id': nuevoId(),
-        'empresa': empresaId,
-        'usuario': usuarioId,
-        'nombre_empresa': datos.empresa.trim(),
-        'nombre': datos.propietario.trim(),
-        'correo': correo,
-        'sal': base64Encode(sal),
-        'hash': base64Encode(hash),
-        'iteraciones': iteraciones,
-        'activa': 1,
-      };
-      await tx.insert('cuentas', cuenta);
-      return cuenta;
+      return _insertarCuenta(
+        tx,
+        empresaId: empresaId,
+        nombreEmpresa: datos.empresa.trim(),
+        nombre: datos.propietario.trim(),
+        correo: correo,
+        clave: clave,
+        rol: RolCuenta.propietario,
+      );
+    });
+  });
+
+  Future<Map<String, Object?>> _insertarCuenta(
+    Transaction tx, {
+    required String empresaId,
+    required String nombreEmpresa,
+    required String nombre,
+    required String correo,
+    required ({String sal, String hash}) clave,
+    required RolCuenta rol,
+  }) async {
+    final usuarioId = nuevoId();
+    await tx.insert('empresas', {
+      'id': empresaId,
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
+    await tx.insert('usuarios', {'empresa': empresaId, 'id': usuarioId});
+    final cuenta = <String, Object?>{
+      'id': nuevoId(),
+      'empresa': empresaId,
+      'usuario': usuarioId,
+      'nombre_empresa': nombreEmpresa,
+      'nombre': nombre,
+      'correo': correo,
+      'sal': clave.sal,
+      'hash': clave.hash,
+      'iteraciones': iteraciones,
+      'activa': 1,
+      'rol': rol.name,
+    };
+    await tx.insert('cuentas', cuenta);
+    return cuenta;
+  }
+
+  /// El administrador se crea una sola vez y con la autorización de un
+  /// propietario activo, para que nadie más pueda ver las cuentas.
+  Future<bool> puedeCrearAdministrador() async {
+    final db = await base.abrir;
+    return await _contar(db, RolCuenta.propietario) > 0 &&
+        await _contar(db, RolCuenta.administrador) == 0;
+  }
+
+  Future<void> crearAdministrador(
+    DatosAdministrador datos, {
+    required String correoPropietario,
+    required String clavePropietario,
+  }) => _ejecutar(() async {
+    datos.validar();
+    final correo = DatosRegistro.normalizarCorreo(datos.correo);
+    final db = await base.abrir;
+    if (await _contar(db, RolCuenta.administrador) > 0) {
+      throw const AccesoException(_yaHayAdministrador);
+    }
+    final filas = await db.query(
+      'cuentas',
+      where: 'correo = ? AND rol = ?',
+      whereArgs: [
+        DatosRegistro.normalizarCorreo(correoPropietario),
+        RolCuenta.propietario.name,
+      ],
+    );
+    final duenio = filas.isEmpty ? null : filas.single;
+    if (!await Claves.coincide(clavePropietario, duenio) ||
+        duenio?['activa'] != 1) {
+      throw const AccesoException(_propietarioIncorrecto);
+    }
+    if (await _correoRegistrado(db, correo)) {
+      throw const AccesoException(_correoEnUso);
+    }
+    final clave = await Claves.nueva(datos.clave);
+    return db.transaction((tx) async {
+      if (await _contar(tx, RolCuenta.administrador) > 0) {
+        throw const AccesoException(_yaHayAdministrador);
+      }
+      if (await _correoRegistrado(tx, correo)) {
+        throw const AccesoException(_correoEnUso);
+      }
+      // La empresa propia del administrador nunca tiene datos de negocio.
+      return _insertarCuenta(
+        tx,
+        empresaId: nuevoId(),
+        nombreEmpresa: 'Administración',
+        nombre: datos.nombre.trim(),
+        correo: correo,
+        clave: clave,
+        rol: RolCuenta.administrador,
+      );
     });
   });
 
@@ -235,24 +349,16 @@ class AutenticacionLocal extends ChangeNotifier {
       whereArgs: [DatosRegistro.normalizarCorreo(correo)],
     );
     final cuenta = filas.isEmpty ? null : filas.single;
-    // Igual trabajo de derivación para un correo inexistente y uno registrado.
-    final sal = cuenta == null
-        ? List<int>.filled(32, 0)
-        : base64Decode(cuenta['sal'] as String);
-    final hash = await compute(_derivarClave, (
-      clave,
-      sal,
-      cuenta?['iteraciones'] as int? ?? iteraciones,
-    ));
-    final esperado = cuenta == null
-        ? List<int>.filled(32, 0)
-        : base64Decode(cuenta['hash'] as String);
-    var diferencia = hash.length ^ esperado.length;
-    for (var i = 0; i < hash.length && i < esperado.length; i++) {
-      diferencia |= hash[i] ^ esperado[i];
-    }
-    if (cuenta == null || diferencia != 0 || cuenta['activa'] != 1) {
+    // Mismo trabajo de derivación para un correo inexistente y uno registrado.
+    final valida = await Claves.coincide(clave, cuenta);
+    if (cuenta == null || !valida) {
       throw const AccesoException('Correo o contraseña incorrectos.');
+    }
+    // Solo quien conoce la contraseña sabe que la cuenta está desactivada.
+    if (cuenta['activa'] != 1) {
+      throw const AccesoException(
+        'Esta cuenta está desactivada. Pide al administrador que la active.',
+      );
     }
     final actuales = await db.query(
       'cuentas',

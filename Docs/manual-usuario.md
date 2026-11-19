@@ -42,7 +42,19 @@ La primera cuenta vincula los registros de la empresa local anterior, si existen
 
 Para entrar, escribe el correo y la contraseña en **Inicia sesión** y pulsa **Iniciar sesión**. En Inventario verás el nombre de tu empresa. Para salir, abre **Cuenta de empresa**, el icono de usuario de la barra superior, y selecciona **Cerrar sesión**. La aplicación vuelve al acceso y retira el historial de pantallas privadas.
 
-Las cuentas se guardan en este dispositivo. Al reiniciar la aplicación deberás entrar de nuevo. El correo se utiliza como identificador; no se envía un mensaje de verificación y no existe recuperación de contraseña por correo. Guarda tus credenciales: el equipo no puede recuperar la contraseña original.
+Las cuentas se guardan en este dispositivo. Al reiniciar la aplicación deberás entrar de nuevo. El correo se utiliza como identificador; no se envía un mensaje de verificación y no existe recuperación de contraseña por correo. Guarda tus credenciales: nadie puede recuperar la contraseña original, aunque el administrador puede asignarte una nueva.
+
+### Cuenta de administrador
+
+Cada dispositivo puede tener **un** administrador. Su función es gestionar las cuentas, no los negocios: no ve inventario, compras, ventas, gastos ni reportes.
+
+- **Crearlo:** en la pantalla de acceso pulsa **Crear administrador**. La opción aparece cuando ya existe al menos una cuenta de propietario y todavía no hay administrador. Escribe el correo y la contraseña de un propietario activo, que autoriza la creación, y luego el nombre, el correo y la contraseña del administrador. Al terminar se abre su panel.
+- **Entrar:** el administrador usa la misma pantalla **Inicia sesión** con su correo y contraseña.
+- **Usuarios registrados:** el panel muestra cada cuenta con su empresa, propietario, correo y estado. Nunca muestra contraseñas.
+- **Desactivar o activar:** una cuenta desactivada no puede entrar; al intentarlo con la contraseña correcta verá «Esta cuenta está desactivada». Si tenía la sesión abierta, su siguiente operación la cierra. Sus datos se conservan.
+- **Restablecer contraseña:** asigna una contraseña nueva de 8 a 128 caracteres y comunícala al propietario por un medio seguro. La anterior deja de funcionar.
+
+El administrador no puede desactivarse ni cambiar su propia contraseña desde el panel.
 
 | Forma de uso | Qué ocurre con los datos |
 | --- | --- |
@@ -52,7 +64,13 @@ Las cuentas se guardan en este dispositivo. Al reiniciar la aplicación deberás
 
 El equipo selecciona el modo al ejecutar la aplicación; no existe un interruptor dentro del menú para cambiar entre modo normal y demostración. Si ves «Escenarios de prueba», son controles de la demostración: cambiar de escenario reinicia sus registros ficticios.
 
-Los datos de Android se guardan en el dispositivo. Esta versión no ofrece sincronización, exportación, copia de seguridad ni restauración desde sus pantallas. Antes de borrar los datos de la aplicación o desinstalarla, solicita al equipo un procedimiento de respaldo si necesitas conservar tus registros.
+Los datos de Android se guardan en el dispositivo. Esta versión no ofrece sincronización, pero sí respaldos manuales:
+
+- **Exportar respaldo:** en **Inventario**, abre el menú de la cuenta (icono de persona) y elige **Exportar respaldo**. Elige dónde guardar el archivo `finanzasist-respaldo-AAAA-MM-DD-HHMM.db`, por ejemplo en Google Drive o en una memoria. El archivo contiene todos los datos del negocio y las cuentas del dispositivo: guárdalo en un lugar seguro.
+- **Restaurar respaldo:** desde el mismo menú, elige **Restaurar respaldo** y el archivo. Tras confirmar, todos los datos del dispositivo se reemplazan por los del respaldo y debes iniciar sesión con una cuenta del respaldo. No se puede deshacer: exporta antes si quieres conservar los datos actuales.
+- **En un teléfono nuevo o recién instalado,** la pantalla de acceso muestra **Restaurar un respaldo** mientras no exista ninguna cuenta.
+
+La aplicación rechaza archivos dañados, de otras aplicaciones o creados por una versión más nueva, y en esos casos conserva los datos actuales. Los respaldos solo están disponibles cuando el dispositivo tiene una sola cuenta de empresa. Exporta un respaldo antes de borrar los datos de la aplicación o desinstalarla.
 
 ## 2. Moverse por la aplicación
 
